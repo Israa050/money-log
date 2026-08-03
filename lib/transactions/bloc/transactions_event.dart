@@ -6,13 +6,15 @@ sealed class TransactionsEvent {}
 final class AppLaunchEvent extends TransactionsEvent {}
 
 final class AddTransactionEvent extends TransactionsEvent {
-  final String item;
+  final int amountMinor;
+  final TransactionType type;
+  final String? note;
 
-  AddTransactionEvent({required this.item});
+  AddTransactionEvent({required this.amountMinor, required this.type, this.note});
 }
 
 final class DeleteTransactionEvent extends TransactionsEvent {
-  final int id;
+  final String id;
 
   DeleteTransactionEvent({required this.id});
 }
