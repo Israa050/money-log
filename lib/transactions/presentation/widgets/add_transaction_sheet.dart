@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
 import 'package:stockflow/transactions/data/models/transactions.dart';
+import 'package:stockflow/transactions/presentation/format.dart';
 
 Future<void> showAddTransactionSheet(BuildContext context) {
   final bloc = context.read<TransactionsBloc>();
@@ -38,8 +39,9 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
 
-    final amount = double.parse(_amountController.text);
-    final amountMinor = (amount * 100).round();
+    // Guaranteed non-null: the form validator below already rejects any
+    // input parseAmountToMinor would reject.
+    final amountMinor = parseAmountToMinor(_amountController.text)!;
     final note = _noteController.text.trim();
 
     setState(() => _isSubmitting = true);
@@ -135,8 +137,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                 validator: (value) {
                   final trimmed = value?.trim() ?? '';
                   if (trimmed.isEmpty) return 'Enter an amount';
-                  final parsed = double.tryParse(trimmed);
-                  if (parsed == null || parsed <= 0) {
+                  if (parseAmountToMinor(trimmed) == null) {
                     return 'Enter a valid positive amount';
                   }
                   return null;

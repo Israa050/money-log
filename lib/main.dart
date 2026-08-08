@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stockflow/core/app_bloc_observer.dart';
 import 'package:stockflow/core/service_locator.dart';
+import 'package:stockflow/transactions/bloc/balance_cubit.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
 import 'package:stockflow/transactions/presentation/screens/transactions_screen.dart';
 
@@ -30,8 +31,11 @@ class MyApp extends StatelessWidget {
         ),
         cardTheme: const CardThemeData(elevation: 0, margin: EdgeInsets.zero),
       ),
-      home: BlocProvider(
-        create: (_) => getIt<TransactionsBloc>(),
+      home: MultiBlocProvider(
+        providers: [
+          BlocProvider(create: (_) => getIt<TransactionsBloc>()),
+          BlocProvider(create: (_) => getIt<BalanceCubit>()),
+        ],
         child: const TransactionsScreen(),
       ),
     );

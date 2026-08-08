@@ -6,6 +6,23 @@ String formatAmountMinor(int amountMinor) {
   return '$sign\$$whole.$cents';
 }
 
+/// Parses a user-typed amount (e.g. the text in the amount field) into
+/// minor units (cents). Returns null if [input] isn't a valid, positive
+/// number -- callers should treat that the same as a failed validation.
+///
+/// Rounds to the nearest cent rather than truncating, so a typed value
+/// like "19.999" (three decimal places) becomes 2000, not 1999 -- and
+/// uses round() specifically to avoid the double bankers'-rounding
+/// surprises Dart's num.round() does NOT have (it always rounds
+/// half-away-from-zero), matching how a user reads "19.995" as "$20.00".
+int? parseAmountToMinor(String input) {
+  final parsed = double.tryParse(input.trim());
+  if (parsed == null || parsed.isNaN || !parsed.isFinite || parsed <= 0) {
+    return null;
+  }
+  return (parsed * 100).round();
+}
+
 String formatDate(DateTime dateTime) {
   final local = dateTime.toLocal();
   String two(int n) => n.toString().padLeft(2, '0');

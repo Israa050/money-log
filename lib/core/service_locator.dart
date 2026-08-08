@@ -1,4 +1,5 @@
 import 'package:get_it/get_it.dart';
+import 'package:stockflow/transactions/bloc/balance_cubit.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
 import 'package:stockflow/transactions/data/connection.dart';
 import 'package:stockflow/transactions/data/repos/transactions_repository.dart';
@@ -19,5 +20,9 @@ void setupServiceLocator() {
     () => TransactionsBloc(
       transactionsRepository: getIt<TransactionsRepository>(),
     ),
+  );
+
+  getIt.registerFactory<BalanceCubit>(
+    () => BalanceCubit(transactionsRepository: getIt<TransactionsRepository>()),
   );
 }
