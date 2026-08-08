@@ -228,5 +228,118 @@ void main() {
         },
       );
     });
+
+    group('balance', () {
+      test('empty table -> 0', () async {
+        final result = await dataSource.balance.first;
+        expect(result, 0);
+      });
+
+      test('income only -> sum of amountMinor', () async {
+        await dataSource.addTransaction(
+          buildEntry(
+            id: const Uuid().v4(),
+            amountMinor: 500,
+            type: TransactionType.income,
+          ),
+        );
+        await dataSource.addTransaction(
+          buildEntry(
+            id: const Uuid().v4(),
+            amountMinor: 250,
+            type: TransactionType.income,
+          ),
+        );
+
+        final result = await dataSource.balance.first;
+        expect(result, 750);
+      });
+
+      test('income minus expense -> net balance', () async {
+        await dataSource.addTransaction(
+          buildEntry(
+            id: const Uuid().v4(),
+            amountMinor: 1000,
+            type: TransactionType.income,
+          ),
+        );
+        await dataSource.addTransaction(
+          buildEntry(
+            id: const Uuid().v4(),
+            amountMinor: 350,
+            type: TransactionType.expense,
+          ),
+        );
+
+        final result = await dataSource.balance.first;
+        expect(result, 650);
+      });
+
+      test('expense exceeding income -> negative balance', () async {
+        await dataSource.addTransaction(
+          buildEntry(
+            id: const Uuid().v4(),
+            amountMinor: 100,
+            type: TransactionType.income,
+          ),
+        );
+        await dataSource.addTransaction(
+          buildEntry(
+            id: const Uuid().v4(),
+            amountMinor: 400,
+            type: TransactionType.expense,
+          ),
+        );
+
+        final result = await dataSource.balance.first;
+        expect(result, -300);
+      });
+
+      test('matches the sum computed from allTransactions', () async {
+        final entries = [
+          (amountMinor: 500, type: TransactionType.income),
+          (amountMinor: 120, type: TransactionType.expense),
+          (amountMinor: 75, type: TransactionType.expense),
+          (amountMinor: 900, type: TransactionType.income),
+        ];
+        for (final entry in entries) {
+          await dataSource.addTransaction(
+            buildEntry(
+              id: const Uuid().v4(),
+              amountMinor: entry.amountMinor,
+              type: entry.type,
+            ),
+          );
+        }
+
+        final rows = await dataSource.allTransactions.first;
+        final expected = rows.fold<int>(
+          0,
+          (sum, t) =>
+              sum +
+              (t.type == TransactionType.income
+                  ? t.amountMinor
+                  : -t.amountMinor),
+        );
+
+        final result = await dataSource.balance.first;
+        expect(result, expected);
+      });
+
+      test(
+        'emits() an updated total when a row is inserted after subscribing',
+        () async {
+          expectLater(dataSource.balance, emitsInOrder([0, 500]));
+          await Future<void>.delayed(Duration.zero);
+          await dataSource.addTransaction(
+            buildEntry(
+              id: const Uuid().v4(),
+              amountMinor: 500,
+              type: TransactionType.income,
+            ),
+          );
+        },
+      );
+    });
   });
 }

@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stockflow/core/service_locator.dart';
 import 'package:stockflow/main.dart';
+import 'package:stockflow/transactions/bloc/balance_cubit.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
 import 'package:stockflow/transactions/data/repos/transactions_repository.dart';
 import 'package:stockflow/transactions/data/transactions_data_source.dart';
@@ -23,6 +24,10 @@ void main() {
       () => TransactionsBloc(
         transactionsRepository: getIt<TransactionsRepository>(),
       ),
+    );
+    getIt.registerFactory<BalanceCubit>(
+      () =>
+          BalanceCubit(transactionsRepository: getIt<TransactionsRepository>()),
     );
 
     addTearDown(() async {

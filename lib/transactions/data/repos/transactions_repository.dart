@@ -26,6 +26,10 @@ class TransactionsRepository {
     return dataSource.allTransactions;
   }
 
+  Stream<int> watchBalance() {
+    return dataSource.balance;
+  }
+
   Future<Result<int>> addTransaction(TransactionsCompanion entry) async {
     try {
       final result = await dataSource.addTransaction(entry);

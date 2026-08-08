@@ -25,4 +25,19 @@ class TransactionsDataSource extends _$TransactionsDataSource {
   Future<int> deleteTransaction(String id) {
     return (delete(transactions)..where((item) => item.id.equals(id))).go();
   }
+
+  Stream<int> get balance {
+    final incomeSum = transactions.amountMinor.sum(
+      filter: transactions.type.equalsValue(TransactionType.income),
+    );
+    final expenseSum = transactions.amountMinor.sum(
+      filter: transactions.type.equalsValue(TransactionType.expense),
+    );
+    final query = selectOnly(transactions)..addColumns([incomeSum, expenseSum]);
+    return query.watchSingle().map((row) {
+      final income = row.read(incomeSum) ?? 0;
+      final expense = row.read(expenseSum) ?? 0;
+      return income - expense;
+    });
+  }
 }

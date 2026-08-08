@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:stockflow/transactions/bloc/balance_cubit.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
 import 'package:stockflow/transactions/data/models/transactions.dart';
 import 'package:stockflow/transactions/data/transactions_data_source.dart'
@@ -231,6 +232,18 @@ class _BalanceSummary extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                   color: Theme.of(context).colorScheme.onPrimaryContainer,
                 ),
+              ),
+              BlocBuilder<BalanceCubit, int>(
+                builder: (context, dbBalance) {
+                  return Text(
+                    'DB total: ${formatAmountMinor(dbBalance)}',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onPrimaryContainer.withValues(alpha: 0.55),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 16),
               Row(
