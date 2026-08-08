@@ -9,10 +9,8 @@ Future<void> showAddTransactionSheet(BuildContext context) {
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (sheetContext) => BlocProvider.value(
-      value: bloc,
-      child: const AddTransactionSheet(),
-    ),
+    builder: (sheetContext) =>
+        BlocProvider.value(value: bloc, child: const AddTransactionSheet()),
   );
 }
 
@@ -28,6 +26,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
   TransactionType _type = TransactionType.expense;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -43,6 +42,8 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
     final amountMinor = (amount * 100).round();
     final note = _noteController.text.trim();
 
+    setState(() => _isSubmitting = true);
+
     context.read<TransactionsBloc>().add(
       AddTransactionEvent(
         amountMinor: amountMinor,
@@ -50,7 +51,6 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
         note: note.isEmpty ? null : note,
       ),
     );
-    Navigator.of(context).pop();
   }
 
   @override
@@ -66,82 +66,114 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
         top: 12,
         bottom: MediaQuery.of(context).viewInsets.bottom + 20,
       ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.outlineVariant,
-                  borderRadius: BorderRadius.circular(2),
+      child: BlocListener<TransactionsBloc, TransactionsState>(
+        listenWhen: (previous, current) => _isSubmitting,
+        listener: (context, state) {
+          if (state is TransactionsError) {
+            setState(() => _isSubmitting = false);
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(state.message)));
+          } else if (state is Loaded) {
+            Navigator.of(context).pop();
+          }
+        },
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            Text(
-              'Add transaction',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            SegmentedButton<TransactionType>(
-              segments: const [
-                ButtonSegment(
-                  value: TransactionType.expense,
-                  label: Text('Expense'),
-                  icon: Icon(Icons.remove),
+              Text(
+                'Add transaction',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+              SegmentedButton<TransactionType>(
+                segments: const [
+                  ButtonSegment(
+                    value: TransactionType.expense,
+                    label: Text('Expense'),
+                    icon: Icon(Icons.remove),
+                  ),
+                  ButtonSegment(
+                    value: TransactionType.income,
+                    label: Text('Income'),
+                    icon: Icon(Icons.add),
+                  ),
+                ],
+                selected: {_type},
+                onSelectionChanged: (selection) =>
+                    setState(() => _type = selection.first),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _amountController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
                 ),
-                ButtonSegment(
-                  value: TransactionType.income,
-                  label: Text('Income'),
-                  icon: Icon(Icons.add),
+                decoration: InputDecoration(
+                  labelText: 'Amount',
+                  prefixText: '\$',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-              ],
-              selected: {_type},
-              onSelectionChanged: (selection) =>
-                  setState(() => _type = selection.first),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _amountController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                labelText: 'Amount',
-                prefixText: '\$',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                validator: (value) {
+                  final trimmed = value?.trim() ?? '';
+                  if (trimmed.isEmpty) return 'Enter an amount';
+                  final parsed = double.tryParse(trimmed);
+                  if (parsed == null || parsed <= 0) {
+                    return 'Enter a valid positive amount';
+                  }
+                  return null;
+                },
               ),
-              validator: (value) {
-                final trimmed = value?.trim() ?? '';
-                if (trimmed.isEmpty) return 'Enter an amount';
-                final parsed = double.tryParse(trimmed);
-                if (parsed == null || parsed <= 0) {
-                  return 'Enter a valid positive amount';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _noteController,
-              decoration: InputDecoration(
-                labelText: 'Note (optional)',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _noteController,
+                decoration: InputDecoration(
+                  labelText: 'Note (optional)',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: 24),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: _isSubmitting ? null : _submit,
+                child: _isSubmitting
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Save'),
               ),
-              onPressed: _submit,
-              child: const Text('Save'),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

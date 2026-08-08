@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:stockflow/transactions/data/models/transactions.dart' show TransactionType;
-import 'package:stockflow/transactions/data/transactions_data_source.dart' show Transaction;
+import 'package:stockflow/transactions/data/models/transactions.dart'
+    show TransactionType;
+import 'package:stockflow/transactions/data/transactions_data_source.dart'
+    show Transaction;
 import 'package:stockflow/transactions/presentation/format.dart';
 
 class TransactionTile extends StatelessWidget {
@@ -47,7 +49,9 @@ class TransactionTile extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outlineVariant.withValues(alpha: 0.5),
                 ),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -57,7 +61,9 @@ class TransactionTile extends StatelessWidget {
                     radius: 20,
                     backgroundColor: color.withValues(alpha: 0.12),
                     child: Icon(
-                      isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                      isIncome
+                          ? Icons.arrow_downward_rounded
+                          : Icons.arrow_upward_rounded,
                       color: color,
                       size: 20,
                     ),
@@ -71,16 +77,16 @@ class TransactionTile extends StatelessWidget {
                           transaction.note?.isNotEmpty == true
                               ? transaction.note!
                               : (isIncome ? 'Income' : 'Expense'),
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
                         Text(
                           formatDate(transaction.occuredTime),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
                                 color: Theme.of(context).colorScheme.outline,
                               ),
                         ),
@@ -90,7 +96,11 @@ class TransactionTile extends StatelessWidget {
                   const SizedBox(width: 8),
                   Text(
                     '$sign${formatAmountMinor(transaction.amountMinor)}',
-                    style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 15),
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
                   ),
                 ],
               ),

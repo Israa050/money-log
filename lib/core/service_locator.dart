@@ -16,6 +16,8 @@ void setupServiceLocator() {
   );
 
   getIt.registerFactory<TransactionsBloc>(
-    () => TransactionsBloc(transactionsRepository: getIt<TransactionsRepository>()),
+    () => TransactionsBloc(
+      transactionsRepository: getIt<TransactionsRepository>(),
+    ),
   );
 }

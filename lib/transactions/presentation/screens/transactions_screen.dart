@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
 import 'package:stockflow/transactions/data/models/transactions.dart';
-import 'package:stockflow/transactions/data/transactions_data_source.dart' show Transaction;
+import 'package:stockflow/transactions/data/transactions_data_source.dart'
+    show Transaction;
 import 'package:stockflow/transactions/presentation/format.dart';
 import 'package:stockflow/transactions/presentation/widgets/add_transaction_sheet.dart';
 import 'package:stockflow/transactions/presentation/widgets/transaction_tile.dart';
@@ -74,7 +75,6 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         builder: (context, state) {
           final allData = switch (state) {
             TransactionsInitial() => null,
-            Loading(:final previousData) => previousData,
             Loaded(:final data) => data,
             TransactionsError(:final previousData) => previousData,
           };
@@ -82,13 +82,13 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           if (state is TransactionsError) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.message)),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(state.message)));
             });
           }
 
-          if (allData == null || (state is Loading && allData.isEmpty)) {
+          if (allData == null) {
             return const Center(child: CircularProgressIndicator());
           }
 
@@ -108,8 +108,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           final data = _pendingDeleteIds.isEmpty
               ? allData
               : allData
-                  .where((t) => !_pendingDeleteIds.contains(t.id))
-                  .toList();
+                    .where((t) => !_pendingDeleteIds.contains(t.id))
+                    .toList();
 
           return Column(
             children: [
@@ -219,16 +219,18 @@ class _BalanceSummary extends StatelessWidget {
               Text(
                 'Balance',
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.7),
-                    ),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onPrimaryContainer.withValues(alpha: 0.7),
+                ),
               ),
               const SizedBox(height: 4),
               Text(
                 formatAmountMinor(balance),
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onPrimaryContainer,
-                    ),
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
               ),
               const SizedBox(height: 16),
               Row(
@@ -289,15 +291,12 @@ class _SummaryStat extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: Theme.of(context).textTheme.labelSmall,
-                ),
+                Text(label, style: Theme.of(context).textTheme.labelSmall),
                 Text(
                   formatAmountMinor(amountMinor),
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                 ),
               ],
             ),
@@ -326,15 +325,15 @@ class _EmptyState extends StatelessWidget {
           Text(
             'No transactions yet',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.outline,
-                ),
+              color: Theme.of(context).colorScheme.outline,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             'Tap + to add your first one',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.outline,
-                ),
+              color: Theme.of(context).colorScheme.outline,
+            ),
           ),
         ],
       ),

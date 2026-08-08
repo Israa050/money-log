@@ -4,8 +4,7 @@ import 'package:stockflow/transactions/data/models/transactions.dart';
 import 'package:stockflow/transactions/data/transactions_data_source.dart';
 import 'package:uuid/uuid.dart';
 
-class TransactionsRepository{
-
+class TransactionsRepository {
   final TransactionsDataSource dataSource;
 
   TransactionsRepository({required this.dataSource});
@@ -23,30 +22,24 @@ class TransactionsRepository{
     );
   }
 
-  Future<Result<List<Transaction>>> getAllTransactions()async{
-    try{
-      final result = await dataSource.allTransactions;
+  Stream<List<Transaction>> getAllTransactions() {
+    return dataSource.allTransactions;
+  }
+
+  Future<Result<int>> addTransaction(TransactionsCompanion entry) async {
+    try {
+      final result = await dataSource.addTransaction(entry);
       return Success(result);
-    }catch(e){
+    } catch (e) {
       return Failure(e.toString());
     }
   }
 
-
-  Future<Result<int>> addTransaction(TransactionsCompanion entry)async{
-    try{
-       final result = await dataSource.addTransaction(entry);
-       return Success(result);
-    }catch(e){
-      return Failure(e.toString());
-    }
-  }
-
-  Future<Result<int>> deleteTransaction(String id)async{
-    try{
+  Future<Result<int>> deleteTransaction(String id) async {
+    try {
       final result = await dataSource.deleteTransaction(id);
       return Success(result);
-    }catch(e){
+    } catch (e) {
       return Failure(e.toString());
     }
   }

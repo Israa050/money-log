@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:stockflow/core/app_bloc_observer.dart';
 import 'package:stockflow/core/service_locator.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
 import 'package:stockflow/transactions/presentation/screens/transactions_screen.dart';
 
 void main() {
+  Bloc.observer = AppBlocObserver();
   setupServiceLocator();
   runApp(const MyApp());
 }
@@ -26,10 +28,7 @@ class MyApp extends StatelessWidget {
           elevation: 0,
           scrolledUnderElevation: 1,
         ),
-        cardTheme: const CardThemeData(
-          elevation: 0,
-          margin: EdgeInsets.zero,
-        ),
+        cardTheme: const CardThemeData(elevation: 0, margin: EdgeInsets.zero),
       ),
       home: BlocProvider(
         create: (_) => getIt<TransactionsBloc>(),
