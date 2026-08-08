@@ -1,5 +1,3 @@
-
-
 import 'package:drift/drift.dart';
 import 'package:stockflow/transactions/data/models/transactions.dart';
 
@@ -12,9 +10,15 @@ class TransactionsDataSource extends _$TransactionsDataSource {
   @override
   int get schemaVersion => 1;
 
-  Future<List<Transaction>> get allTransactions => select(transactions).get();
+  Stream<List<Transaction>> get allTransactions {
+    return (select(transactions)..orderBy([
+          (t) =>
+              OrderingTerm(expression: t.occuredTime, mode: OrderingMode.desc),
+        ]))
+        .watch();
+  }
 
-  Future<int> addTransaction(TransactionsCompanion entry){
+  Future<int> addTransaction(TransactionsCompanion entry) {
     return into(transactions).insert(entry);
   }
 

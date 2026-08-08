@@ -5,12 +5,6 @@ sealed class TransactionsState {}
 
 final class TransactionsInitial extends TransactionsState {}
 
-final class Loading extends TransactionsState {
-  final List<Transaction> previousData;
-
-  Loading({required this.previousData});
-}
-
 final class Loaded extends TransactionsState {
   final List<Transaction> data;
 

@@ -11,6 +11,12 @@ import 'package:stockflow/transactions/data/transactions_data_source.dart';
 // only reliable via a duplicate-id insert (see transactions_repository_test's
 // notes on why closing the connection doesn't work), so failure coverage here
 // is limited to AddTransactionEvent, where that trick applies.
+//
+// AppLaunchEvent subscribes to the repository's watch stream; it no longer
+// emits Loading before Loaded -- the first stream tick goes straight to
+// Loaded. AddTransactionEvent/DeleteTransactionEvent only emit on failure;
+// on success they rely on the AppLaunchEvent subscription's next tick to
+// push a refreshed Loaded, so those tests must start with AppLaunchEvent.
 
 void main() {
   late TransactionsDataSource dataSource;
@@ -33,7 +39,7 @@ void main() {
       expect(bloc.state, isA<TransactionsInitial>());
     });
 
-    test('empty table -> Loading([]) then Loaded([]).', () async {
+    test('empty table -> emits Loaded([]).', () async {
       final states = <TransactionsState>[];
       final sub = bloc.stream.listen(states.add);
 
@@ -41,13 +47,15 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 50));
       await sub.cancel();
 
-      expect(states, [isA<Loading>(), isA<Loaded>()]);
-      expect((states[0] as Loading).previousData, isEmpty);
-      expect((states[1] as Loaded).data, isEmpty);
+      expect(states, [isA<Loaded>()]);
+      expect((states.single as Loaded).data, isEmpty);
     });
 
     test('existing rows -> Loaded contains them.', () async {
-      final entry = repository.newTransactionEntry(amountMinor: 10, type: TransactionType.income);
+      final entry = repository.newTransactionEntry(
+        amountMinor: 10,
+        type: TransactionType.income,
+      );
       await repository.addTransaction(entry);
 
       final states = <TransactionsState>[];
@@ -60,38 +68,49 @@ void main() {
       final loaded = states.last as Loaded;
       expect(loaded.data.single.id, entry.id.value);
     });
+
+    test(
+      'a second AppLaunchEvent does not create a second subscription.',
+      () async {
+        bloc.add(AppLaunchEvent());
+        await Future.delayed(const Duration(milliseconds: 50));
+
+        final states = <TransactionsState>[];
+        final sub = bloc.stream.listen(states.add);
+        bloc.add(AppLaunchEvent());
+        await Future.delayed(const Duration(milliseconds: 50));
+        await sub.cancel();
+
+        // If a second subscription were created, inserting a row later would
+        // deliver two Loaded emissions per change instead of one.
+        expect(states, isEmpty);
+      },
+    );
   });
 
   group('AddTransactionEvent', () {
-    test('success -> Loading(previousData: current) then a refreshed Loaded including the new row.', () async {
-      final states = <TransactionsState>[];
-      final sub = bloc.stream.listen(states.add);
-
-      bloc.add(AddTransactionEvent(amountMinor: 500, type: TransactionType.expense, note: 'coffee'));
-      await Future.delayed(const Duration(milliseconds: 50));
-      await sub.cancel();
-
-      expect(states, [isA<Loading>(), isA<Loaded>()]);
-      expect((states[0] as Loading).previousData, isEmpty);
-      final loaded = states[1] as Loaded;
-      expect(loaded.data.single.amountMinor, 500);
-      expect(loaded.data.single.note, 'coffee');
-    });
-
-    test('previousData carries forward the prior Loaded.data, not reset to [].', () async {
+    test('success -> no direct emission; the live subscription pushes a '
+        'refreshed Loaded including the new row.', () async {
       bloc.add(AppLaunchEvent());
       await Future.delayed(const Duration(milliseconds: 50));
-      final firstLoaded = bloc.state as Loaded;
-      expect(firstLoaded.data, isEmpty);
 
       final states = <TransactionsState>[];
       final sub = bloc.stream.listen(states.add);
-      bloc.add(AddTransactionEvent(amountMinor: 100, type: TransactionType.income));
+
+      bloc.add(
+        AddTransactionEvent(
+          amountMinor: 500,
+          type: TransactionType.expense,
+          note: 'coffee',
+        ),
+      );
       await Future.delayed(const Duration(milliseconds: 50));
       await sub.cancel();
 
-      final loadingState = states.first as Loading;
-      expect(loadingState.previousData, firstLoaded.data);
+      expect(states, [isA<Loaded>()]);
+      final loaded = states.single as Loaded;
+      expect(loaded.data.single.amountMinor, 500);
+      expect(loaded.data.single.note, 'coffee');
     });
 
     // Not tested here: driving AddTransactionEvent itself into the
@@ -108,8 +127,12 @@ void main() {
   });
 
   group('DeleteTransactionEvent', () {
-    test('success -> Loading then a refreshed Loaded with the row removed.', () async {
-      final entry = repository.newTransactionEntry(amountMinor: 40, type: TransactionType.expense);
+    test('success -> no direct emission; the live subscription pushes a '
+        'refreshed Loaded with the row removed.', () async {
+      final entry = repository.newTransactionEntry(
+        amountMinor: 40,
+        type: TransactionType.expense,
+      );
       await repository.addTransaction(entry);
       bloc.add(AppLaunchEvent());
       await Future.delayed(const Duration(milliseconds: 50));
@@ -120,11 +143,12 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 50));
       await sub.cancel();
 
-      expect(states, [isA<Loading>(), isA<Loaded>()]);
-      expect((states.last as Loaded).data, isEmpty);
+      expect(states, [isA<Loaded>()]);
+      expect((states.single as Loaded).data, isEmpty);
     });
 
-    test('non-existent id -> still succeeds, emits a refreshed Loaded (not an error).', () async {
+    test('non-existent id -> still succeeds; the subscription re-emits the '
+        'unchanged Loaded (not an error).', () async {
       bloc.add(AppLaunchEvent());
       await Future.delayed(const Duration(milliseconds: 50));
 
@@ -134,7 +158,10 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 50));
       await sub.cancel();
 
-      expect(states, [isA<Loading>(), isA<Loaded>()]);
+      // Deleting a non-existent id doesn't change the table, so Drift's
+      // watch() query does not re-emit -- there is nothing for the
+      // subscription to push, and no error is emitted either.
+      expect(states, isEmpty);
     });
   });
 }
