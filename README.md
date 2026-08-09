@@ -18,7 +18,7 @@
   <img alt="State management" src="https://img.shields.io/badge/state-flutter__bloc-6C4EE3" />
   <img alt="Database" src="https://img.shields.io/badge/db-Drift%20(SQLite)-4A6FD4" />
   <img alt="CI" src="https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white" />
-  <img alt="License" src="https://img.shields.io/badge/license-unspecified-lightgrey" />
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-green" /></a>
 </p>
 
 <p align="center">
@@ -345,3 +345,7 @@ erDiagram
   `AppBlocObserver` for full event/state logging.
 - GitHub Actions CI running format checks, static analysis, and the full
   test suite on every PR into `main`.
+
+## 📄 License
+
+[MIT](LICENSE) — free to use, modify, and distribute, with no warranty.
