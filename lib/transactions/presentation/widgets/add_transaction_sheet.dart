@@ -149,9 +149,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
               const SizedBox(height: 14),
               TextFormField(
                 controller: _noteController,
-                decoration: const InputDecoration(
-                  labelText: 'Note (optional)',
-                ),
+                decoration: const InputDecoration(labelText: 'Note (optional)'),
               ),
               const SizedBox(height: 20),
               FilledButton(

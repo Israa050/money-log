@@ -115,9 +115,7 @@ class AppTheme {
         ),
         actionTextColor: const Color(0xFF93B4FF),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
   }
