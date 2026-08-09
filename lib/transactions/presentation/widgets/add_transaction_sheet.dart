@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:stockflow/core/theme/app_colors.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
 import 'package:stockflow/transactions/data/models/transactions.dart';
 import 'package:stockflow/transactions/presentation/format.dart';
@@ -57,16 +58,18 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: colors.surfaceRaised,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(
         left: 20,
         right: 20,
         top: 12,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
       child: BlocListener<TransactionsBloc, TransactionsState>(
         listenWhen: (previous, current) => _isSubmitting,
@@ -88,22 +91,25 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
             children: [
               Center(
                 child: Container(
-                  width: 40,
+                  width: 36,
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.outlineVariant,
+                    color: colors.line,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
               Text(
                 'Add transaction',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16.5,
+                  fontWeight: FontWeight.w700,
+                  color: colors.ink,
+                ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
               SegmentedButton<TransactionType>(
                 segments: const [
                   ButtonSegment(
@@ -127,12 +133,9 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'Amount',
                   prefixText: '\$',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
                 ),
                 validator: (value) {
                   final trimmed = value?.trim() ?? '';
@@ -143,32 +146,21 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: _noteController,
-                decoration: InputDecoration(
-                  labelText: 'Note (optional)',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
+                decoration: const InputDecoration(labelText: 'Note (optional)'),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               FilledButton(
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
                 onPressed: _isSubmitting ? null : _submit,
                 child: _isSubmitting
-                    ? const SizedBox(
+                    ? SizedBox(
                         height: 20,
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.5,
-                          color: Colors.white,
+                          color: colors.accentInk,
                         ),
                       )
                     : const Text('Save'),
