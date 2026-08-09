@@ -1,18 +1,24 @@
 # StockFlow
 
-A Flutter app for tracking income and expenses, built with the **BLoC**
-pattern on a **reactive** local database: writes land in
-**[Drift](https://drift.simonbinder.eu/)** (SQLite), and the UI updates on
-its own — no manual refresh, no re-fetch after a mutation.
-
 <p align="center">
-  <img src="assets/screenshots/home.jpg" alt="Transactions list with balance summary" width="260" />
+  <img src="assets/screenshots/transactions.jpg" alt="Transactions list with balance summary" width="230" />
   &nbsp;&nbsp;
-  <img src="assets/screenshots/add_transaction_sheet.jpg" alt="Add transaction bottom sheet" width="260" />
+  <img src="assets/screenshots/add_transaction.jpg" alt="Add transaction bottom sheet" width="230" />
+  &nbsp;&nbsp;
+  <img src="assets/screenshots/empty.jpg" alt="Empty state" width="230" />
 </p>
 
 <p align="center">
-  <em>Balance summary &amp; transaction list &nbsp;·&nbsp; Add-transaction sheet</em>
+  <em>Balance summary &amp; transaction list &nbsp;·&nbsp; Add-transaction sheet &nbsp;·&nbsp; Empty state</em>
+</p>
+
+<p align="center">
+  <img alt="Flutter" src="https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white" />
+  <img alt="Dart" src="https://img.shields.io/badge/Dart-3.11-0175C2?logo=dart&logoColor=white" />
+  <img alt="State management" src="https://img.shields.io/badge/state-flutter__bloc-6C4EE3" />
+  <img alt="Database" src="https://img.shields.io/badge/db-Drift%20(SQLite)-4A6FD4" />
+  <img alt="CI" src="https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white" />
+  <img alt="License" src="https://img.shields.io/badge/license-unspecified-lightgrey" />
 </p>
 
 <p align="center">
@@ -23,6 +29,24 @@ its own — no manual refresh, no re-fetch after a mutation.
 
 ---
 
+## 📖 About
+
+StockFlow is a small, focused personal-finance tracker: log income and
+expenses, see your balance update instantly, and undo a delete before it's
+final. It exists as a reference implementation of a **fully reactive**
+Flutter architecture — every screen is driven by a live database stream, not
+a fetch-then-render cycle, so the UI is never more than one SQLite write away
+from the truth.
+
+The app is built with the **BLoC** pattern on top of
+**[Drift](https://drift.simonbinder.eu/)** (a type-safe SQLite layer): a
+write lands in the database, Drift's `.watch()` query notices the table
+changed, and the new data arrives back at the screen on its own — no manual
+refresh, no re-fetch after a mutation, no stale state to reconcile. The UI
+itself uses a warm, editorial dark-first design system with distinct
+income/expense color language, card-based transaction rows, and swipe-to-
+delete with a countdown undo.
+
 ## ✨ Features
 
 - 📊 **Balance summary** — live total balance with income/expense breakdown
@@ -32,6 +56,8 @@ its own — no manual refresh, no re-fetch after a mutation.
 - 🔄 **Fully reactive** — every screen is driven by a live Drift stream; add/delete never trigger a manual reload
 - 💾 **Local persistence** — everything is stored in an on-device SQLite database via Drift
 - 🪵 **Bloc observability** — every event and state transition is logged through a custom `BlocObserver`
+- 🎨 **Themed design system** — light/dark color tokens (`AppColors`), a distinct income/expense
+  palette, and a small, composable widget set instead of one large screen file
 
 ## 🧱 Tech stack
 
@@ -82,9 +108,12 @@ lib/
 ├── core/
 │   ├── app_bloc_observer.dart     # Logs every Bloc event/state change/error
 │   ├── result.dart                # Result<T> (Success/Failure) — shared success/error wrapper
-│   └── service_locator.dart       # get_it setup — registers TransactionsBloc & friends
+│   ├── service_locator.dart       # get_it setup — registers TransactionsBloc & friends
+│   └── theme/
+│       ├── app_colors.dart        # Semantic color tokens (light/dark) as a ThemeExtension
+│       └── app_theme.dart         # Builds ThemeData (app bar, cards, inputs, FAB...) from the tokens
 └── transactions/
-    ├── bloc/                      # TransactionsBloc, events, states
+    ├── bloc/                      # TransactionsBloc, events, states, BalanceCubit
     ├── data/
     │   ├── models/
     │   │   └── transactions.dart  # Drift table definition (Transactions, TransactionType)
@@ -96,10 +125,15 @@ lib/
     └── presentation/
         ├── format.dart                         # Amount/date formatting helpers
         ├── screens/
-        │   └── transactions_screen.dart        # Main screen: summary card + list
+        │   └── transactions_screen.dart        # Main screen: composes the widgets below
         └── widgets/
             ├── add_transaction_sheet.dart       # Bottom sheet for creating a transaction
-            └── transaction_tile.dart            # Swipe-to-delete row
+            ├── balance_summary_card.dart        # Balance figure + income/expense stat pills
+            ├── stat_pill.dart                   # Single income/expense mini stat
+            ├── transaction_tile.dart            # Swipe-to-delete row
+            ├── transactions_list.dart           # List/empty-state switch
+            ├── transactions_empty_state.dart    # "No transactions yet" placeholder
+            └── undo_snackbar_content.dart        # Snackbar body with a shrinking countdown bar
 ```
 
 ## 🔄 Reactive data flow
@@ -282,3 +316,32 @@ erDiagram
   `mocktail` as dev dependencies.
 - No editing of existing transactions — only add and delete.
 - No filtering/search/date-range views over the transaction list.
+
+## 🏷️ Release notes
+
+### v0.2.0 — Themed redesign
+
+- Introduced a dedicated design system (`AppColors` + `AppTheme`) with
+  light and dark color tokens — dark-first, following the system theme by
+  default — replacing the single generic Material seed color.
+- Split the 350+ line `transactions_screen.dart` into small, single-purpose
+  widgets (`BalanceSummaryCard`, `StatPill`, `TransactionsList`,
+  `TransactionsEmptyState`, `UndoSnackBarContent`), leaving the screen file
+  as pure composition and state wiring.
+- Restyled `TransactionTile` and `AddTransactionSheet` to match the new
+  visual language: circular type icons on income/expense wash colors,
+  card-style rows, and a segmented add/expense toggle.
+- Refreshed the app screenshots to reflect the new look.
+
+### v0.1.0 — Reactive core
+
+- `TransactionsBloc` made fully reactive via a single long-lived Drift
+  `.watch()` subscription — add/delete no longer trigger a manual refetch.
+- Added a DB-computed `BalanceCubit` stream and hardened amount parsing
+  (exact minor-unit arithmetic, no floating-point drift).
+- Full presentation layer: balance summary, swipe-to-delete with animated
+  undo, and an add-transaction bottom sheet.
+- Drift-backed `Transactions` schema, `TransactionsRepository`, and
+  `AppBlocObserver` for full event/state logging.
+- GitHub Actions CI running format checks, static analysis, and the full
+  test suite on every PR into `main`.
