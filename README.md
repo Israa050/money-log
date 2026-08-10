@@ -1,4 +1,4 @@
-# StockFlow
+# Money Log
 
 <p align="center">
   <img src="assets/screenshots/transactions.jpg" alt="Transactions list with balance summary" width="230" />
