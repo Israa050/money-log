@@ -7,7 +7,7 @@ class Transactions extends Table {
   IntColumn get amountMinor => integer()();
   TextColumn get type => textEnum<TransactionType>()();
   TextColumn get note => text().nullable()();
-  late final occuredTime = dateTime().withDefault(currentDateAndTime)();
+  late final occurredTime = dateTime().withDefault(currentDateAndTime)();
   late final creationTime = dateTime().withDefault(currentDateAndTime)();
 
   @override

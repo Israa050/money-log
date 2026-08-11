@@ -18,7 +18,7 @@ void main() {
       amountMinor: 500,
       type: TransactionType.expense,
       note: 'coffee',
-      occuredTime: DateTime(2024, 1, 1),
+      occurredTime: DateTime(2024, 1, 1),
       creationTime: DateTime(2024, 1, 1),
     ),
     Transaction(
@@ -26,7 +26,7 @@ void main() {
       amountMinor: 1000,
       type: TransactionType.income,
       note: null,
-      occuredTime: DateTime(2024, 1, 2),
+      occurredTime: DateTime(2024, 1, 2),
       creationTime: DateTime(2024, 1, 2),
     ),
   ];

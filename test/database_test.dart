@@ -21,14 +21,14 @@ void main() {
     int amountMinor = 100,
     TransactionType type = TransactionType.expense,
     Value<String?> note = const Value.absent(),
-    Value<DateTime> occuredTime = const Value.absent(),
+    Value<DateTime> occurredTime = const Value.absent(),
   }) {
     return TransactionsCompanion.insert(
       id: id,
       amountMinor: amountMinor,
       type: type,
       note: note,
-      occuredTime: occuredTime,
+      occurredTime: occurredTime,
     );
   }
 
@@ -42,7 +42,7 @@ void main() {
             amountMinor: 50,
             note: Value('Some note'),
             type: TransactionType.expense,
-            occuredTime: Value(DateTime.now()),
+            occurredTime: Value(DateTime.now()),
           ),
         );
         final result = await dataSource.allTransactions.first;
@@ -58,52 +58,58 @@ void main() {
             id: id,
             amountMinor: 50,
             type: TransactionType.expense,
-            occuredTime: Value(DateTime.now()),
+            occurredTime: Value(DateTime.now()),
           ),
         );
         final result = await dataSource.allTransactions.first;
         expect(result[0].note, null);
       });
 
-      test('occuredTime and creationTime auto-populate when omitted', () async {
-        final before = DateTime.now();
-        final id = const Uuid().v4();
-        await dataSource.addTransaction(buildEntry(id: id));
-        final after = DateTime.now();
+      test(
+        'occurredTime and creationTime auto-populate when omitted',
+        () async {
+          final before = DateTime.now();
+          final id = const Uuid().v4();
+          await dataSource.addTransaction(buildEntry(id: id));
+          final after = DateTime.now();
 
-        final result = (await dataSource.allTransactions.first).single;
-        expect(
-          result.occuredTime.isAfter(
-            before.subtract(const Duration(seconds: 1)),
-          ),
-          isTrue,
-        );
-        expect(
-          result.occuredTime.isBefore(after.add(const Duration(seconds: 1))),
-          isTrue,
-        );
-        expect(
-          result.creationTime.isAfter(
-            before.subtract(const Duration(seconds: 1)),
-          ),
-          isTrue,
-        );
-        expect(
-          result.creationTime.isBefore(after.add(const Duration(seconds: 1))),
-          isTrue,
-        );
-      });
+          final result = (await dataSource.allTransactions.first).single;
+          expect(
+            result.occurredTime.isAfter(
+              before.subtract(const Duration(seconds: 1)),
+            ),
+            isTrue,
+          );
+          expect(
+            result.occurredTime.isBefore(after.add(const Duration(seconds: 1))),
+            isTrue,
+          );
+          expect(
+            result.creationTime.isAfter(
+              before.subtract(const Duration(seconds: 1)),
+            ),
+            isTrue,
+          );
+          expect(
+            result.creationTime.isBefore(after.add(const Duration(seconds: 1))),
+            isTrue,
+          );
+        },
+      );
 
-      test('explicit occuredTime overrides the default (backdating)', () async {
-        final id = const Uuid().v4();
-        final backdated = DateTime(2020, 1, 1);
-        await dataSource.addTransaction(
-          buildEntry(id: id, occuredTime: Value(backdated)),
-        );
+      test(
+        'explicit occurredTime overrides the default (backdating)',
+        () async {
+          final id = const Uuid().v4();
+          final backdated = DateTime(2020, 1, 1);
+          await dataSource.addTransaction(
+            buildEntry(id: id, occurredTime: Value(backdated)),
+          );
 
-        final result = (await dataSource.allTransactions.first).single;
-        expect(result.occuredTime, backdated);
-      });
+          final result = (await dataSource.allTransactions.first).single;
+          expect(result.occurredTime, backdated);
+        },
+      );
 
       test(
         'type round-trips as TransactionType enum, not a raw string',

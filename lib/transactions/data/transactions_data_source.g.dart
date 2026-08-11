@@ -47,12 +47,12 @@ class $TransactionsTable extends Transactions
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _occuredTimeMeta = const VerificationMeta(
-    'occuredTime',
+  static const VerificationMeta _occurredTimeMeta = const VerificationMeta(
+    'occurredTime',
   );
   @override
-  late final GeneratedColumn<DateTime> occuredTime = GeneratedColumn<DateTime>(
-    'occured_time',
+  late final GeneratedColumn<DateTime> occurredTime = GeneratedColumn<DateTime>(
+    'occurred_time',
     aliasedName,
     false,
     type: DriftSqlType.dateTime,
@@ -77,7 +77,7 @@ class $TransactionsTable extends Transactions
     amountMinor,
     type,
     note,
-    occuredTime,
+    occurredTime,
     creationTime,
   ];
   @override
@@ -114,12 +114,12 @@ class $TransactionsTable extends Transactions
         note.isAcceptableOrUnknown(data['note']!, _noteMeta),
       );
     }
-    if (data.containsKey('occured_time')) {
+    if (data.containsKey('occurred_time')) {
       context.handle(
-        _occuredTimeMeta,
-        occuredTime.isAcceptableOrUnknown(
-          data['occured_time']!,
-          _occuredTimeMeta,
+        _occurredTimeMeta,
+        occurredTime.isAcceptableOrUnknown(
+          data['occurred_time']!,
+          _occurredTimeMeta,
         ),
       );
     }
@@ -159,9 +159,9 @@ class $TransactionsTable extends Transactions
         DriftSqlType.string,
         data['${effectivePrefix}note'],
       ),
-      occuredTime: attachedDatabase.typeMapping.read(
+      occurredTime: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
-        data['${effectivePrefix}occured_time'],
+        data['${effectivePrefix}occurred_time'],
       )!,
       creationTime: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
@@ -184,14 +184,14 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   final int amountMinor;
   final TransactionType type;
   final String? note;
-  final DateTime occuredTime;
+  final DateTime occurredTime;
   final DateTime creationTime;
   const Transaction({
     required this.id,
     required this.amountMinor,
     required this.type,
     this.note,
-    required this.occuredTime,
+    required this.occurredTime,
     required this.creationTime,
   });
   @override
@@ -207,7 +207,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     if (!nullToAbsent || note != null) {
       map['note'] = Variable<String>(note);
     }
-    map['occured_time'] = Variable<DateTime>(occuredTime);
+    map['occurred_time'] = Variable<DateTime>(occurredTime);
     map['creation_time'] = Variable<DateTime>(creationTime);
     return map;
   }
@@ -218,7 +218,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       amountMinor: Value(amountMinor),
       type: Value(type),
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
-      occuredTime: Value(occuredTime),
+      occurredTime: Value(occurredTime),
       creationTime: Value(creationTime),
     );
   }
@@ -235,7 +235,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
         serializer.fromJson<String>(json['type']),
       ),
       note: serializer.fromJson<String?>(json['note']),
-      occuredTime: serializer.fromJson<DateTime>(json['occuredTime']),
+      occurredTime: serializer.fromJson<DateTime>(json['occurredTime']),
       creationTime: serializer.fromJson<DateTime>(json['creationTime']),
     );
   }
@@ -249,7 +249,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
         $TransactionsTable.$convertertype.toJson(type),
       ),
       'note': serializer.toJson<String?>(note),
-      'occuredTime': serializer.toJson<DateTime>(occuredTime),
+      'occurredTime': serializer.toJson<DateTime>(occurredTime),
       'creationTime': serializer.toJson<DateTime>(creationTime),
     };
   }
@@ -259,14 +259,14 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     int? amountMinor,
     TransactionType? type,
     Value<String?> note = const Value.absent(),
-    DateTime? occuredTime,
+    DateTime? occurredTime,
     DateTime? creationTime,
   }) => Transaction(
     id: id ?? this.id,
     amountMinor: amountMinor ?? this.amountMinor,
     type: type ?? this.type,
     note: note.present ? note.value : this.note,
-    occuredTime: occuredTime ?? this.occuredTime,
+    occurredTime: occurredTime ?? this.occurredTime,
     creationTime: creationTime ?? this.creationTime,
   );
   Transaction copyWithCompanion(TransactionsCompanion data) {
@@ -277,9 +277,9 @@ class Transaction extends DataClass implements Insertable<Transaction> {
           : this.amountMinor,
       type: data.type.present ? data.type.value : this.type,
       note: data.note.present ? data.note.value : this.note,
-      occuredTime: data.occuredTime.present
-          ? data.occuredTime.value
-          : this.occuredTime,
+      occurredTime: data.occurredTime.present
+          ? data.occurredTime.value
+          : this.occurredTime,
       creationTime: data.creationTime.present
           ? data.creationTime.value
           : this.creationTime,
@@ -293,7 +293,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
           ..write('amountMinor: $amountMinor, ')
           ..write('type: $type, ')
           ..write('note: $note, ')
-          ..write('occuredTime: $occuredTime, ')
+          ..write('occurredTime: $occurredTime, ')
           ..write('creationTime: $creationTime')
           ..write(')'))
         .toString();
@@ -301,7 +301,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
 
   @override
   int get hashCode =>
-      Object.hash(id, amountMinor, type, note, occuredTime, creationTime);
+      Object.hash(id, amountMinor, type, note, occurredTime, creationTime);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -310,7 +310,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
           other.amountMinor == this.amountMinor &&
           other.type == this.type &&
           other.note == this.note &&
-          other.occuredTime == this.occuredTime &&
+          other.occurredTime == this.occurredTime &&
           other.creationTime == this.creationTime);
 }
 
@@ -319,7 +319,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
   final Value<int> amountMinor;
   final Value<TransactionType> type;
   final Value<String?> note;
-  final Value<DateTime> occuredTime;
+  final Value<DateTime> occurredTime;
   final Value<DateTime> creationTime;
   final Value<int> rowid;
   const TransactionsCompanion({
@@ -327,7 +327,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     this.amountMinor = const Value.absent(),
     this.type = const Value.absent(),
     this.note = const Value.absent(),
-    this.occuredTime = const Value.absent(),
+    this.occurredTime = const Value.absent(),
     this.creationTime = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -336,7 +336,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     required int amountMinor,
     required TransactionType type,
     this.note = const Value.absent(),
-    this.occuredTime = const Value.absent(),
+    this.occurredTime = const Value.absent(),
     this.creationTime = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -347,7 +347,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     Expression<int>? amountMinor,
     Expression<String>? type,
     Expression<String>? note,
-    Expression<DateTime>? occuredTime,
+    Expression<DateTime>? occurredTime,
     Expression<DateTime>? creationTime,
     Expression<int>? rowid,
   }) {
@@ -356,7 +356,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
       if (amountMinor != null) 'amount_minor': amountMinor,
       if (type != null) 'type': type,
       if (note != null) 'note': note,
-      if (occuredTime != null) 'occured_time': occuredTime,
+      if (occurredTime != null) 'occurred_time': occurredTime,
       if (creationTime != null) 'creation_time': creationTime,
       if (rowid != null) 'rowid': rowid,
     });
@@ -367,7 +367,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     Value<int>? amountMinor,
     Value<TransactionType>? type,
     Value<String?>? note,
-    Value<DateTime>? occuredTime,
+    Value<DateTime>? occurredTime,
     Value<DateTime>? creationTime,
     Value<int>? rowid,
   }) {
@@ -376,7 +376,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
       amountMinor: amountMinor ?? this.amountMinor,
       type: type ?? this.type,
       note: note ?? this.note,
-      occuredTime: occuredTime ?? this.occuredTime,
+      occurredTime: occurredTime ?? this.occurredTime,
       creationTime: creationTime ?? this.creationTime,
       rowid: rowid ?? this.rowid,
     );
@@ -399,8 +399,8 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     if (note.present) {
       map['note'] = Variable<String>(note.value);
     }
-    if (occuredTime.present) {
-      map['occured_time'] = Variable<DateTime>(occuredTime.value);
+    if (occurredTime.present) {
+      map['occurred_time'] = Variable<DateTime>(occurredTime.value);
     }
     if (creationTime.present) {
       map['creation_time'] = Variable<DateTime>(creationTime.value);
@@ -418,7 +418,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
           ..write('amountMinor: $amountMinor, ')
           ..write('type: $type, ')
           ..write('note: $note, ')
-          ..write('occuredTime: $occuredTime, ')
+          ..write('occurredTime: $occurredTime, ')
           ..write('creationTime: $creationTime, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -444,7 +444,7 @@ typedef $$TransactionsTableCreateCompanionBuilder =
       required int amountMinor,
       required TransactionType type,
       Value<String?> note,
-      Value<DateTime> occuredTime,
+      Value<DateTime> occurredTime,
       Value<DateTime> creationTime,
       Value<int> rowid,
     });
@@ -454,7 +454,7 @@ typedef $$TransactionsTableUpdateCompanionBuilder =
       Value<int> amountMinor,
       Value<TransactionType> type,
       Value<String?> note,
-      Value<DateTime> occuredTime,
+      Value<DateTime> occurredTime,
       Value<DateTime> creationTime,
       Value<int> rowid,
     });
@@ -489,8 +489,8 @@ class $$TransactionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<DateTime> get occuredTime => $composableBuilder(
-    column: $table.occuredTime,
+  ColumnFilters<DateTime> get occurredTime => $composableBuilder(
+    column: $table.occurredTime,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -529,8 +529,8 @@ class $$TransactionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<DateTime> get occuredTime => $composableBuilder(
-    column: $table.occuredTime,
+  ColumnOrderings<DateTime> get occurredTime => $composableBuilder(
+    column: $table.occurredTime,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -563,8 +563,8 @@ class $$TransactionsTableAnnotationComposer
   GeneratedColumn<String> get note =>
       $composableBuilder(column: $table.note, builder: (column) => column);
 
-  GeneratedColumn<DateTime> get occuredTime => $composableBuilder(
-    column: $table.occuredTime,
+  GeneratedColumn<DateTime> get occurredTime => $composableBuilder(
+    column: $table.occurredTime,
     builder: (column) => column,
   );
 
@@ -615,7 +615,7 @@ class $$TransactionsTableTableManager
                 Value<int> amountMinor = const Value.absent(),
                 Value<TransactionType> type = const Value.absent(),
                 Value<String?> note = const Value.absent(),
-                Value<DateTime> occuredTime = const Value.absent(),
+                Value<DateTime> occurredTime = const Value.absent(),
                 Value<DateTime> creationTime = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TransactionsCompanion(
@@ -623,7 +623,7 @@ class $$TransactionsTableTableManager
                 amountMinor: amountMinor,
                 type: type,
                 note: note,
-                occuredTime: occuredTime,
+                occurredTime: occurredTime,
                 creationTime: creationTime,
                 rowid: rowid,
               ),
@@ -633,7 +633,7 @@ class $$TransactionsTableTableManager
                 required int amountMinor,
                 required TransactionType type,
                 Value<String?> note = const Value.absent(),
-                Value<DateTime> occuredTime = const Value.absent(),
+                Value<DateTime> occurredTime = const Value.absent(),
                 Value<DateTime> creationTime = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TransactionsCompanion.insert(
@@ -641,7 +641,7 @@ class $$TransactionsTableTableManager
                 amountMinor: amountMinor,
                 type: type,
                 note: note,
-                occuredTime: occuredTime,
+                occurredTime: occurredTime,
                 creationTime: creationTime,
                 rowid: rowid,
               ),
