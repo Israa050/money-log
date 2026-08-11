@@ -22,6 +22,12 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/Israa050/money-log/releases/latest">
+    <img alt="Download APK" src="https://img.shields.io/github/v/release/Israa050/money-log?label=Download%20APK&logo=android&logoColor=white&color=3DDC84" />
+  </a>
+</p>
+
+<p align="center">
   <a href="https://claude.ai/code/artifact/7ef70167-84d3-4ec5-b1da-6acea789d354">📊 The Reactive Loop — interactive diagram</a>
   &nbsp;·&nbsp;
   <a href="https://claude.ai/code/artifact/97b41c14-86fe-47d7-bbc0-a13aed14b7d2">🖱️ Live transactions demo</a>

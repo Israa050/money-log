@@ -295,7 +295,7 @@ jobs:
         run: flutter build apk --release --target-platform android-arm64
 
       - name: Extract latest changelog entry
-        run: awk '/^## /{n++} n==1' CHANGELOG.md > /tmp/release-notes.md
+        run: awk '/^## /{n++} n==1' CHANGELOG.md > release-notes.md
 
       - name: Upload to Firebase App Distribution
         uses: wzieba/Firebase-Distribution-Github-Action@v1
@@ -304,7 +304,7 @@ jobs:
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           groups: internal
           file: build/app/outputs/flutter-apk/app-release.apk
-          releaseNotesFile: /tmp/release-notes.md
+          releaseNotesFile: release-notes.md
 ```
 
 ### What each step does
@@ -364,6 +364,8 @@ jobs:
 | `apksigner verify` shows `CN=Android Debug, O=Android` | `key.properties`/keystore not found at build time, so Gradle silently fell back to debug signing | Confirm `android/key.properties` exists and `storeFile` path resolves; re-run `apksigner verify` after |
 | Gradle daemon crash: `Out of Memory Error ... Native memory allocation (mmap) failed` | `org.gradle.jvmargs=-Xmx8G` too high for available RAM (e.g. an 11GB machine) | Lower to `-Xmx3G` (and matching `-XX:MaxMetaspaceSize`/`-XX:ReservedCodeCacheSize`) in `android/gradle.properties` |
 | `unknown option '--group'` on `firebase appdistribution:testers:add` | CLI flag name changed across versions | Run `firebase appdistribution:testers:add --help` to check current flags, or add testers via console instead |
+| `File /tmp/release-notes.md does not exist` from the distribution action | The action runs inside its own Docker container, which only mounts `/github/workspace` (the repo checkout) — not the runner's host `/tmp` | Write files a later step needs to read into the workspace (a relative path like `release-notes.md`), never `/tmp` |
+| `HTTP Error: 403, The caller does not have permission` on upload | The service account JSON came from the wrong Google Cloud project (a project only grants IAM roles within itself) | Check `project_id`/`client_email` in the JSON before uploading it as a secret; recreate the service account under the correct project if wrong (§3.6) |
 
 ## Official documentation
 
