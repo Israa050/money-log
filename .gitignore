@@ -43,3 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Personal notes, not for publishing
+NOTES_before_going_public.md
+
+# Release signing (never commit keystores or their credentials)
+*.jks
+*.keystore
+key.properties

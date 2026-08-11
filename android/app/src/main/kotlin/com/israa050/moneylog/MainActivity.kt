@@ -1,4 +1,4 @@
-package com.example.stockflow
+package com.israa050.moneylog
 
 import io.flutter.embedding.android.FlutterActivity
 
