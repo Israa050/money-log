@@ -294,6 +294,9 @@ jobs:
       - name: Build release APK (arm64)
         run: flutter build apk --release --target-platform android-arm64
 
+      - name: Extract latest changelog entry
+        run: awk '/^## /{n++} n==1' CHANGELOG.md > /tmp/release-notes.md
+
       - name: Upload to Firebase App Distribution
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
@@ -301,6 +304,7 @@ jobs:
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           groups: internal
           file: build/app/outputs/flutter-apk/app-release.apk
+          releaseNotesFile: /tmp/release-notes.md
 ```
 
 ### What each step does
