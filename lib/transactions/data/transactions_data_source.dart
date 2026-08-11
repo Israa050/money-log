@@ -13,7 +13,7 @@ class TransactionsDataSource extends _$TransactionsDataSource {
   Stream<List<Transaction>> get allTransactions {
     return (select(transactions)..orderBy([
           (t) =>
-              OrderingTerm(expression: t.occuredTime, mode: OrderingMode.desc),
+              OrderingTerm(expression: t.occurredTime, mode: OrderingMode.desc),
         ]))
         .watch();
   }

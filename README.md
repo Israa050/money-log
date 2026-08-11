@@ -258,7 +258,7 @@ erDiagram
         INTEGER amountMinor "amount in minor units (cents)"
         TEXT type "enum: income | expense"
         TEXT note "nullable"
-        DATETIME occuredTime "defaults to now; can be backdated"
+        DATETIME occurredTime "defaults to now; can be backdated"
         DATETIME creationTime "defaults to now; row insert time"
     }
 ```
@@ -281,10 +281,10 @@ erDiagram
   The set of valid values is fixed and known (`income`, `expense`), so the
   column is typed to match — the compiler catches typos and invalid values at
   the call site instead of letting malformed strings reach the database.
-- **`note` is nullable; `occuredTime`/`creationTime` are not.**
+- **`note` is nullable; `occurredTime`/`creationTime` are not.**
   A transaction doesn't always have a note, so the column allows `NULL`.
   Both timestamps default to "now" via `withDefault(currentDateAndTime)`, but
-  `occuredTime` can be overridden on insert to log a backdated transaction,
+  `occurredTime` can be overridden on insert to log a backdated transaction,
   while `creationTime` is meant to always reflect actual insert time.
 
 ## ✅ What's implemented

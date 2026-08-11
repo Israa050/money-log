@@ -81,7 +81,7 @@ class TransactionTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 1),
                     Text(
-                      formatDate(transaction.occuredTime),
+                      formatDate(transaction.occurredTime),
                       style: TextStyle(fontSize: 11.5, color: colors.inkFaint),
                     ),
                   ],
