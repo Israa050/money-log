@@ -31,7 +31,7 @@
 
 ## 📖 About
 
-StockFlow is a small, focused personal-finance tracker: log income and
+Money Log is a small, focused personal-finance tracker: log income and
 expenses, see your balance update instantly, and undo a delete before it's
 final. It exists as a reference implementation of a **fully reactive**
 Flutter architecture — every screen is driven by a live database stream, not
@@ -68,6 +68,7 @@ delete with a countdown undo.
 | DI             | [get_it](https://pub.dev/packages/get_it)                     |
 | IDs            | [uuid](https://pub.dev/packages/uuid) (client-generated v4)   |
 | Logging        | [logger](https://pub.dev/packages/logger)                     |
+| Testing        | [bloc_test](https://pub.dev/packages/bloc_test) + [mocktail](https://pub.dev/packages/mocktail) |
 | CI             | [GitHub Actions](.github/workflows/flutter-test.yml)          |
 
 ## 🚀 Getting started
@@ -87,9 +88,18 @@ flutter run
 flutter test
 ```
 
-Every test file drives a real in-memory Drift database
-(`NativeDatabase.memory()`) instead of mocks, so no state leaks between
-tests and nothing touches disk.
+Two complementary approaches are used:
+
+- **Drift-backed tests** (`database_test.dart`, `transactions_repository_test.dart`,
+  `transactions_bloc_test.dart`, `widget_test.dart`) drive a real in-memory
+  Drift database (`NativeDatabase.memory()`) instead of mocks, so no state
+  leaks between tests and nothing touches disk.
+- **Mocktail-backed bloc/cubit tests** (`transactions_bloc_mocktail_test.dart`,
+  `balance_cubit_mocktail_test.dart`) use [`bloc_test`](https://pub.dev/packages/bloc_test)
+  and [`mocktail`](https://pub.dev/packages/mocktail) with a
+  `MockTransactionsRepository` ([`test/helpers/mocks.dart`](test/helpers/mocks.dart))
+  to assert state emissions in isolation, including failure paths a real
+  repository can't be forced into (see below).
 
 ### Continuous integration
 
@@ -305,15 +315,27 @@ erDiagram
     nothing on success (only the subscription does).
   - `test/widget_test.dart` — boots the full widget tree against an
     in-memory database with proper teardown.
+- Mocktail-backed bloc/cubit unit tests, using `MockTransactionsRepository`
+  in place of a real database:
+  - `test/transactions_bloc_mocktail_test.dart` — `TransactionsBloc` against
+    a mocked repository:
+    - `AppLaunchEvent`: repository stream success → `Loaded`; repository
+      stream error → `TransactionsError` (covers the `onError` handling
+      added to the launch subscription).
+    - `AddTransactionEvent` / `DeleteTransactionEvent`: success → no direct
+      emission (call verified via `verify(...).called(1)`); failure →
+      `TransactionsError`, asserted both with no prior state (empty
+      `previousData`) and seeded from a prior `Loaded` state (`previousData`
+      preserved) — the `TransactionsError` branch a real repository can't be
+      forced into, since ids are generated internally and duplicate-id
+      collisions aren't reachable through the public event API.
+  - `test/balance_cubit_mocktail_test.dart` — `BalanceCubit` against a mocked
+    repository: initial state is `0` before the stream emits, a single
+    stream value is re-emitted as-is, and multiple stream values are emitted
+    in order.
 
 ## 🚧 Not yet done
 
-- No bloc-level test coverage for the `TransactionsError` branch of
-  `AddTransactionEvent`/`DeleteTransactionEvent` — forcing a real repository
-  failure through the public event API isn't possible (ids are generated
-  internally, so duplicate-id collisions can't be triggered from outside).
-  Closing this gap needs a mock repository, i.e. adding `bloc_test` +
-  `mocktail` as dev dependencies.
 - No editing of existing transactions — only add and delete.
 - No filtering/search/date-range views over the transaction list.
 

@@ -10,6 +10,11 @@ final class _TransactionsUpdated extends TransactionsEvent {
   _TransactionsUpdated({required this.data});
 }
 
+final class _TransactionsFailed extends TransactionsEvent {
+  final String message;
+  _TransactionsFailed({required this.message});
+}
+
 final class AddTransactionEvent extends TransactionsEvent {
   final int amountMinor;
   final TransactionType type;

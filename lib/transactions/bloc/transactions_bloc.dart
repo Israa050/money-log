@@ -14,6 +14,7 @@ class TransactionsBloc extends Bloc<TransactionsEvent, TransactionsState> {
     : super(TransactionsInitial()) {
     on<AppLaunchEvent>(_onLaunch);
     on<_TransactionsUpdated>(_onTransactionsUpdated);
+    on<_TransactionsFailed>(_onTransactionsFailed);
     on<AddTransactionEvent>(_onAddTransaction);
     on<DeleteTransactionEvent>(_onDeleteTransaction);
   }
@@ -25,6 +26,7 @@ class TransactionsBloc extends Bloc<TransactionsEvent, TransactionsState> {
     if (_subscription != null) return;
     _subscription = transactionsRepository.getAllTransactions().listen(
       (items) => add(_TransactionsUpdated(data: items)),
+      onError: (Object e) => add(_TransactionsFailed(message: e.toString())),
     );
   }
 
@@ -33,6 +35,13 @@ class TransactionsBloc extends Bloc<TransactionsEvent, TransactionsState> {
     Emitter<TransactionsState> emit,
   ) {
     emit(Loaded(data: event.data));
+  }
+
+  void _onTransactionsFailed(
+    _TransactionsFailed event,
+    Emitter<TransactionsState> emit,
+  ) {
+    emit(TransactionsError(message: event.message, previousData: _currentData));
   }
 
   Future<void> _onAddTransaction(
