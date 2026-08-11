@@ -14,7 +14,11 @@ Firebase App Distribution shows testers for the current release.
 - Fixed a silent bug where a repository stream error during app launch
   produced an uncaught async error instead of a `TransactionsError` state.
 - Set up the `production` deploy pipeline: signed release builds now go
-  out to Firebase App Distribution automatically.
+  out to Firebase App Distribution automatically, with real per-release
+  notes pulled from this file.
+- Added a "Download APK" badge to the README linking to the latest GitHub
+  release, so visitors can actually install the app instead of just
+  reading about it.
 
 ## v0.2.0 — Themed redesign
 
