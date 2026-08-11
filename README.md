@@ -70,6 +70,7 @@ delete with a countdown undo.
 | Logging        | [logger](https://pub.dev/packages/logger)                     |
 | Testing        | [bloc_test](https://pub.dev/packages/bloc_test) + [mocktail](https://pub.dev/packages/mocktail) |
 | CI             | [GitHub Actions](.github/workflows/flutter-test.yml)          |
+| CD             | [GitHub Actions](.github/workflows/deploy-production.yml) + [Firebase App Distribution](https://firebase.google.com/docs/app-distribution) |
 
 ## 🚀 Getting started
 
@@ -108,6 +109,16 @@ Every pull request into `main` runs
 dependency install → Drift code generation → `dart format` check →
 `flutter analyze` → `flutter test`. A PR can't merge with a formatting
 issue, an analyzer warning, or a failing test.
+
+### Continuous deployment
+
+Pushing to the `production` branch runs
+[`.github/workflows/deploy-production.yml`](.github/workflows/deploy-production.yml):
+it builds a signed, arm64-only release APK and uploads it to Firebase App
+Distribution's `internal` tester group. `production` is a deploy-only
+branch, separate from `main`. Full setup steps, the release-signing
+approach, and troubleshooting notes are in
+[`docs/firebase-app-distribution.md`](docs/firebase-app-distribution.md).
 
 ## 🗂️ Project structure
 
