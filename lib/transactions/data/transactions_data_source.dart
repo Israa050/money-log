@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:stockflow/transactions/data/models/transactions.dart';
+import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
 
 part 'transactions_data_source.g.dart';
 

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stockflow/core/theme/app_colors.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
-import 'package:stockflow/transactions/data/models/transactions.dart';
+import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
 import 'package:stockflow/transactions/presentation/format.dart';
 
 Future<void> showAddTransactionSheet(BuildContext context) {

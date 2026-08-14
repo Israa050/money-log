@@ -2,8 +2,13 @@ import 'package:get_it/get_it.dart';
 import 'package:stockflow/transactions/bloc/balance_cubit.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
 import 'package:stockflow/transactions/data/connection.dart';
-import 'package:stockflow/transactions/data/repos/transactions_repository.dart';
+import 'package:stockflow/transactions/data/repos/transactions_repository_impl.dart';
 import 'package:stockflow/transactions/data/transactions_data_source.dart';
+import 'package:stockflow/transactions/domain/repositories/transactions_repository.dart';
+import 'package:stockflow/transactions/domain/usecases/add_transaction_usecase.dart';
+import 'package:stockflow/transactions/domain/usecases/delete_transaction_usecase.dart';
+import 'package:stockflow/transactions/domain/usecases/get_transactions_usecase.dart';
+import 'package:stockflow/transactions/domain/usecases/watch_balance_usecase.dart';
 
 final getIt = GetIt.instance;
 
@@ -13,16 +18,35 @@ void setupServiceLocator() {
   );
 
   getIt.registerLazySingleton<TransactionsRepository>(
-    () => TransactionsRepository(dataSource: getIt<TransactionsDataSource>()),
+    () =>
+        TransactionsRepositoryImpl(dataSource: getIt<TransactionsDataSource>()),
+  );
+
+  getIt.registerLazySingleton<GetTransactionsUseCase>(
+    () => GetTransactionsUseCase(getIt<TransactionsRepository>()),
+  );
+
+  getIt.registerLazySingleton<WatchBalanceUseCase>(
+    () => WatchBalanceUseCase(getIt<TransactionsRepository>()),
+  );
+
+  getIt.registerLazySingleton<AddTransactionUseCase>(
+    () => AddTransactionUseCase(getIt<TransactionsRepository>()),
+  );
+
+  getIt.registerLazySingleton<DeleteTransactionUseCase>(
+    () => DeleteTransactionUseCase(getIt<TransactionsRepository>()),
   );
 
   getIt.registerFactory<TransactionsBloc>(
     () => TransactionsBloc(
-      transactionsRepository: getIt<TransactionsRepository>(),
+      getTransactionsUseCase: getIt<GetTransactionsUseCase>(),
+      addTransactionUseCase: getIt<AddTransactionUseCase>(),
+      deleteTransactionUseCase: getIt<DeleteTransactionUseCase>(),
     ),
   );
 
   getIt.registerFactory<BalanceCubit>(
-    () => BalanceCubit(transactionsRepository: getIt<TransactionsRepository>()),
+    () => BalanceCubit(watchBalanceUseCase: getIt<WatchBalanceUseCase>()),
   );
 }

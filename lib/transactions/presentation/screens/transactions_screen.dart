@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
-import 'package:stockflow/transactions/data/models/transactions.dart';
-import 'package:stockflow/transactions/data/transactions_data_source.dart'
-    show Transaction;
+import 'package:stockflow/transactions/domain/entities/transaction_entity.dart';
+import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
 import 'package:stockflow/transactions/presentation/widgets/add_transaction_sheet.dart';
 import 'package:stockflow/transactions/presentation/widgets/balance_summary_card.dart';
 import 'package:stockflow/transactions/presentation/widgets/transactions_list.dart';
@@ -31,7 +30,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     context.read<TransactionsBloc>().add(AppLaunchEvent());
   }
 
-  void _handleSwipeToDelete(Transaction transaction) {
+  void _handleSwipeToDelete(TransactionEntity transaction) {
     setState(() => _pendingDeleteIds.add(transaction.id));
 
     final bloc = context.read<TransactionsBloc>();

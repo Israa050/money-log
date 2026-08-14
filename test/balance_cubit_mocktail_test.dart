@@ -6,47 +6,39 @@ import 'package:stockflow/transactions/bloc/balance_cubit.dart';
 import 'helpers/mocks.dart';
 
 void main() {
-  late MockTransactionsRepository mockTransactionsRepository;
+  late MockWatchBalanceUseCase watchBalanceUseCase;
 
   setUp(() {
-    mockTransactionsRepository = MockTransactionsRepository();
+    watchBalanceUseCase = MockWatchBalanceUseCase();
   });
 
   group('BalanceCubit', () {
-    test('initial state is 0 before the repository stream emits', () {
-      when(
-        () => mockTransactionsRepository.watchBalance(),
-      ).thenAnswer((_) => const Stream.empty());
+    test('initial state is 0 before the use case stream emits', () {
+      when(() => watchBalanceUseCase()).thenAnswer((_) => const Stream.empty());
 
-      final cubit = BalanceCubit(
-        transactionsRepository: mockTransactionsRepository,
-      );
+      final cubit = BalanceCubit(watchBalanceUseCase: watchBalanceUseCase);
       addTearDown(cubit.close);
 
       expect(cubit.state, 0);
     });
 
     blocTest<BalanceCubit, int>(
-      'repository stream emits a value -> cubit emits that value',
+      'use case stream emits a value -> cubit emits that value',
       setUp: () {
-        when(
-          () => mockTransactionsRepository.watchBalance(),
-        ).thenAnswer((_) => Stream.value(1500));
+        when(() => watchBalanceUseCase()).thenAnswer((_) => Stream.value(1500));
       },
-      build: () =>
-          BalanceCubit(transactionsRepository: mockTransactionsRepository),
+      build: () => BalanceCubit(watchBalanceUseCase: watchBalanceUseCase),
       expect: () => [1500],
     );
 
     blocTest<BalanceCubit, int>(
-      'repository stream emits multiple values -> cubit emits each in order',
+      'use case stream emits multiple values -> cubit emits each in order',
       setUp: () {
         when(
-          () => mockTransactionsRepository.watchBalance(),
+          () => watchBalanceUseCase(),
         ).thenAnswer((_) => Stream.fromIterable([100, 250, 0, -50]));
       },
-      build: () =>
-          BalanceCubit(transactionsRepository: mockTransactionsRepository),
+      build: () => BalanceCubit(watchBalanceUseCase: watchBalanceUseCase),
       expect: () => [100, 250, 0, -50],
     );
   });

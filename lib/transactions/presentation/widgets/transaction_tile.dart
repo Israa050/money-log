@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:stockflow/core/theme/app_colors.dart';
-import 'package:stockflow/transactions/data/models/transactions.dart'
-    show TransactionType;
-import 'package:stockflow/transactions/data/transactions_data_source.dart'
-    show Transaction;
+import 'package:stockflow/transactions/domain/entities/transaction_entity.dart';
+import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
 import 'package:stockflow/transactions/presentation/format.dart';
 
 class TransactionTile extends StatelessWidget {
@@ -13,7 +11,7 @@ class TransactionTile extends StatelessWidget {
     required this.onDelete,
   });
 
-  final Transaction transaction;
+  final TransactionEntity transaction;
   final VoidCallback onDelete;
 
   @override
@@ -81,7 +79,7 @@ class TransactionTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 1),
                     Text(
-                      formatDate(transaction.occurredTime),
+                      formatDate(transaction.timestamp),
                       style: TextStyle(fontSize: 11.5, color: colors.inkFaint),
                     ),
                   ],

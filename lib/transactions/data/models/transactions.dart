@@ -1,6 +1,5 @@
 import 'package:drift/drift.dart';
-
-enum TransactionType { income, expense }
+import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
 
 class Transactions extends Table {
   TextColumn get id => text()();

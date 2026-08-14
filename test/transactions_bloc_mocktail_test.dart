@@ -3,40 +3,43 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:stockflow/core/result.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
-import 'package:stockflow/transactions/data/models/transactions.dart';
-import 'package:stockflow/transactions/data/transactions_data_source.dart';
+import 'package:stockflow/transactions/domain/entities/transaction_entity.dart';
+import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
 
 import 'helpers/mocks.dart';
 
 void main() {
-  late MockTransactionsRepository mockTransactionsRepository;
+  late MockGetTransactionsUseCase getTransactionsUseCase;
+  late MockAddTransactionUseCase addTransactionUseCase;
+  late MockDeleteTransactionUseCase deleteTransactionUseCase;
   late TransactionsBloc transactionsBloc;
 
   final fakeTransactions = [
-    Transaction(
+    TransactionEntity(
       id: 't1',
       amountMinor: 500,
       type: TransactionType.expense,
       note: 'coffee',
-      occurredTime: DateTime(2024, 1, 1),
-      creationTime: DateTime(2024, 1, 1),
+      timestamp: DateTime(2024, 1, 1),
     ),
-    Transaction(
+    TransactionEntity(
       id: 't2',
       amountMinor: 1000,
       type: TransactionType.income,
       note: null,
-      occurredTime: DateTime(2024, 1, 2),
-      creationTime: DateTime(2024, 1, 2),
+      timestamp: DateTime(2024, 1, 2),
     ),
   ];
 
   setUp(() {
-    mockTransactionsRepository = MockTransactionsRepository();
+    getTransactionsUseCase = MockGetTransactionsUseCase();
+    addTransactionUseCase = MockAddTransactionUseCase();
+    deleteTransactionUseCase = MockDeleteTransactionUseCase();
     transactionsBloc = TransactionsBloc(
-      transactionsRepository: mockTransactionsRepository,
+      getTransactionsUseCase: getTransactionsUseCase,
+      addTransactionUseCase: addTransactionUseCase,
+      deleteTransactionUseCase: deleteTransactionUseCase,
     );
-    registerFallbackValue(FakeTransactionsCompanion());
     registerFallbackValue(TransactionType.expense);
   });
 
@@ -51,10 +54,10 @@ void main() {
     );
 
     blocTest<TransactionsBloc, TransactionsState>(
-      'repository stream emits data -> emits Loaded with that data',
+      'use case stream emits data -> emits Loaded with that data',
       setUp: () {
         when(
-          () => mockTransactionsRepository.getAllTransactions(),
+          () => getTransactionsUseCase(),
         ).thenAnswer((_) => Stream.value(fakeTransactions));
       },
       build: () => transactionsBloc,
@@ -67,10 +70,10 @@ void main() {
 
   group('AppLaunchEvent failure', () {
     blocTest<TransactionsBloc, TransactionsState>(
-      'repository stream emits an error -> emits TransactionsError',
+      'use case stream emits an error -> emits TransactionsError',
       setUp: () {
         when(
-          () => mockTransactionsRepository.getAllTransactions(),
+          () => getTransactionsUseCase(),
         ).thenAnswer((_) => Stream.error('Data not found'));
       },
       build: () => transactionsBloc,
@@ -85,18 +88,15 @@ void main() {
 
   group('AddTransactionEvent success', () {
     blocTest<TransactionsBloc, TransactionsState>(
-      'repository add succeeds -> emits nothing directly',
+      'use case add succeeds -> emits nothing directly',
       setUp: () {
         when(
-          () => mockTransactionsRepository.newTransactionEntry(
+          () => addTransactionUseCase(
             amountMinor: any(named: 'amountMinor'),
             type: any(named: 'type'),
             note: any(named: 'note'),
           ),
-        ).thenReturn(FakeTransactionsCompanion());
-        when(
-          () => mockTransactionsRepository.addTransaction(any()),
-        ).thenAnswer((_) async => Success(1));
+        ).thenAnswer((_) async => const Success(null));
       },
       build: () => transactionsBloc,
       act: (bloc) => bloc.add(
@@ -108,25 +108,26 @@ void main() {
       ),
       expect: () => [],
       verify: (_) => verify(
-        () => mockTransactionsRepository.addTransaction(any()),
+        () => addTransactionUseCase(
+          amountMinor: 500,
+          type: TransactionType.expense,
+          note: 'Coffee',
+        ),
       ).called(1),
     );
   });
 
   group('AddTransactionEvent failure', () {
     blocTest<TransactionsBloc, TransactionsState>(
-      'repository add fails with no prior data -> emits TransactionsError with empty previousData',
+      'use case add fails with no prior data -> emits TransactionsError with empty previousData',
       setUp: () {
         when(
-          () => mockTransactionsRepository.newTransactionEntry(
+          () => addTransactionUseCase(
             amountMinor: any(named: 'amountMinor'),
             type: any(named: 'type'),
             note: any(named: 'note'),
           ),
-        ).thenReturn(FakeTransactionsCompanion());
-        when(
-          () => mockTransactionsRepository.addTransaction(any()),
-        ).thenAnswer((_) async => Failure('Failed To Load'));
+        ).thenAnswer((_) async => const Failure('Failed To Load'));
       },
       build: () => transactionsBloc,
       act: (bloc) => bloc.add(
@@ -142,23 +143,24 @@ void main() {
             .having((s) => s.previousData, 'previousData', isEmpty),
       ],
       verify: (_) => verify(
-        () => mockTransactionsRepository.addTransaction(any()),
+        () => addTransactionUseCase(
+          amountMinor: 500,
+          type: TransactionType.expense,
+          note: 'Coffee',
+        ),
       ).called(1),
     );
 
     blocTest<TransactionsBloc, TransactionsState>(
-      'repository add fails after data was loaded -> emits TransactionsError with previousData preserved',
+      'use case add fails after data was loaded -> emits TransactionsError with previousData preserved',
       setUp: () {
         when(
-          () => mockTransactionsRepository.newTransactionEntry(
+          () => addTransactionUseCase(
             amountMinor: any(named: 'amountMinor'),
             type: any(named: 'type'),
             note: any(named: 'note'),
           ),
-        ).thenReturn(FakeTransactionsCompanion());
-        when(
-          () => mockTransactionsRepository.addTransaction(any()),
-        ).thenAnswer((_) async => Failure('Failed To Load'));
+        ).thenAnswer((_) async => const Failure('Failed To Load'));
       },
       build: () => transactionsBloc,
       seed: () => Loaded(data: fakeTransactions),
@@ -175,35 +177,37 @@ void main() {
             .having((s) => s.previousData, 'previousData', fakeTransactions),
       ],
       verify: (_) => verify(
-        () => mockTransactionsRepository.addTransaction(any()),
+        () => addTransactionUseCase(
+          amountMinor: 500,
+          type: TransactionType.expense,
+          note: 'Coffee',
+        ),
       ).called(1),
     );
   });
 
   group('DeleteTransactionEvent success', () {
     blocTest<TransactionsBloc, TransactionsState>(
-      'repository delete succeeds -> emits nothing directly',
+      'use case delete succeeds -> emits nothing directly',
       setUp: () {
         when(
-          () => mockTransactionsRepository.deleteTransaction(any()),
-        ).thenAnswer((_) async => Success(1));
+          () => deleteTransactionUseCase(any()),
+        ).thenAnswer((_) async => const Success(1));
       },
       build: () => transactionsBloc,
       act: (bloc) => bloc.add(DeleteTransactionEvent(id: '1234')),
       expect: () => [],
-      verify: (_) => verify(
-        () => mockTransactionsRepository.deleteTransaction(any()),
-      ).called(1),
+      verify: (_) => verify(() => deleteTransactionUseCase('1234')).called(1),
     );
   });
 
   group('DeleteTransactionEvent failure', () {
     blocTest<TransactionsBloc, TransactionsState>(
-      'repository delete fails with no prior data -> emits TransactionsError with empty previousData',
+      'use case delete fails with no prior data -> emits TransactionsError with empty previousData',
       setUp: () {
         when(
-          () => mockTransactionsRepository.deleteTransaction(any()),
-        ).thenAnswer((_) async => Failure('Data cannot be deleted'));
+          () => deleteTransactionUseCase(any()),
+        ).thenAnswer((_) async => const Failure('Data cannot be deleted'));
       },
       build: () => transactionsBloc,
       act: (bloc) => bloc.add(DeleteTransactionEvent(id: '1234')),
@@ -212,17 +216,15 @@ void main() {
             .having((s) => s.message, 'message', 'Data cannot be deleted')
             .having((s) => s.previousData, 'previousData', isEmpty),
       ],
-      verify: (_) => verify(
-        () => mockTransactionsRepository.deleteTransaction(any()),
-      ).called(1),
+      verify: (_) => verify(() => deleteTransactionUseCase('1234')).called(1),
     );
 
     blocTest<TransactionsBloc, TransactionsState>(
-      'repository delete fails after data was loaded -> emits TransactionsError with previousData preserved',
+      'use case delete fails after data was loaded -> emits TransactionsError with previousData preserved',
       setUp: () {
         when(
-          () => mockTransactionsRepository.deleteTransaction(any()),
-        ).thenAnswer((_) async => Failure('Data cannot be deleted'));
+          () => deleteTransactionUseCase(any()),
+        ).thenAnswer((_) async => const Failure('Data cannot be deleted'));
       },
       build: () => transactionsBloc,
       seed: () => Loaded(data: fakeTransactions),
@@ -232,9 +234,7 @@ void main() {
             .having((s) => s.message, 'message', 'Data cannot be deleted')
             .having((s) => s.previousData, 'previousData', fakeTransactions),
       ],
-      verify: (_) => verify(
-        () => mockTransactionsRepository.deleteTransaction(any()),
-      ).called(1),
+      verify: (_) => verify(() => deleteTransactionUseCase('1234')).called(1),
     );
   });
 }
