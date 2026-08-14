@@ -1,9 +1,13 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
-import 'package:stockflow/transactions/data/models/transactions.dart';
-import 'package:stockflow/transactions/data/repos/transactions_repository.dart';
+import 'package:stockflow/transactions/data/repos/transactions_repository_impl.dart';
 import 'package:stockflow/transactions/data/transactions_data_source.dart';
+import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
+import 'package:stockflow/transactions/domain/repositories/transactions_repository.dart';
+import 'package:stockflow/transactions/domain/usecases/add_transaction_usecase.dart';
+import 'package:stockflow/transactions/domain/usecases/delete_transaction_usecase.dart';
+import 'package:stockflow/transactions/domain/usecases/get_transactions_usecase.dart';
 
 // Not using bloc_test/mocktail here (neither is a dev_dependency yet) --
 // these drive a real in-memory TransactionsDataSource instead, same approach
@@ -21,12 +25,22 @@ import 'package:stockflow/transactions/data/transactions_data_source.dart';
 void main() {
   late TransactionsDataSource dataSource;
   late TransactionsRepository repository;
+  late GetTransactionsUseCase getTransactionsUseCase;
+  late AddTransactionUseCase addTransactionUseCase;
+  late DeleteTransactionUseCase deleteTransactionUseCase;
   late TransactionsBloc bloc;
 
   setUp(() {
     dataSource = TransactionsDataSource(NativeDatabase.memory());
-    repository = TransactionsRepository(dataSource: dataSource);
-    bloc = TransactionsBloc(transactionsRepository: repository);
+    repository = TransactionsRepositoryImpl(dataSource: dataSource);
+    getTransactionsUseCase = GetTransactionsUseCase(repository);
+    addTransactionUseCase = AddTransactionUseCase(repository);
+    deleteTransactionUseCase = DeleteTransactionUseCase(repository);
+    bloc = TransactionsBloc(
+      getTransactionsUseCase: getTransactionsUseCase,
+      addTransactionUseCase: addTransactionUseCase,
+      deleteTransactionUseCase: deleteTransactionUseCase,
+    );
   });
 
   tearDown(() async {
@@ -52,11 +66,10 @@ void main() {
     });
 
     test('existing rows -> Loaded contains them.', () async {
-      final entry = repository.newTransactionEntry(
+      await repository.addTransaction(
         amountMinor: 10,
         type: TransactionType.income,
       );
-      await repository.addTransaction(entry);
 
       final states = <TransactionsState>[];
       final sub = bloc.stream.listen(states.add);
@@ -66,7 +79,8 @@ void main() {
       await sub.cancel();
 
       final loaded = states.last as Loaded;
-      expect(loaded.data.single.id, entry.id.value);
+      expect(loaded.data.single.amountMinor, 10);
+      expect(loaded.data.single.type, TransactionType.income);
     });
 
     test(
@@ -114,11 +128,11 @@ void main() {
     });
 
     // Not tested here: driving AddTransactionEvent itself into the
-    // TransactionsError branch. newTransactionEntry() (called inside
-    // _onAddTransaction) generates a fresh uuid per call, and the event API
-    // only exposes amountMinor/type/note -- there's no way to make the
-    // bloc's own handler collide on id through the public event API, so a
-    // real failure can't be forced this way. transactions_repository_test
+    // TransactionsError branch. addTransaction() generates a fresh uuid
+    // internally per call, and the event API only exposes
+    // amountMinor/type/note -- there's no way to make the bloc's own handler
+    // collide on id through the public event API, so a real failure can't be
+    // forced this way. transactions_repository_test
     // already covers the addTransaction-returns-Failure-on-duplicate-id case
     // directly; what's missing is bloc-level coverage of the failure
     // branch's previousData handling, which would need a fake/mock
@@ -129,17 +143,17 @@ void main() {
   group('DeleteTransactionEvent', () {
     test('success -> no direct emission; the live subscription pushes a '
         'refreshed Loaded with the row removed.', () async {
-      final entry = repository.newTransactionEntry(
+      await repository.addTransaction(
         amountMinor: 40,
         type: TransactionType.expense,
       );
-      await repository.addTransaction(entry);
+      final entryId = (await repository.getAllTransactions().first).single.id;
       bloc.add(AppLaunchEvent());
       await Future.delayed(const Duration(milliseconds: 50));
 
       final states = <TransactionsState>[];
       final sub = bloc.stream.listen(states.add);
-      bloc.add(DeleteTransactionEvent(id: entry.id.value));
+      bloc.add(DeleteTransactionEvent(id: entryId));
       await Future.delayed(const Duration(milliseconds: 50));
       await sub.cancel();
 

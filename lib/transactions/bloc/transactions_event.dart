@@ -6,7 +6,7 @@ sealed class TransactionsEvent {}
 final class AppLaunchEvent extends TransactionsEvent {}
 
 final class _TransactionsUpdated extends TransactionsEvent {
-  final List<Transaction> data;
+  final List<TransactionEntity> data;
   _TransactionsUpdated({required this.data});
 }
 

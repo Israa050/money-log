@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:stockflow/transactions/data/transactions_data_source.dart'
-    show Transaction;
+import 'package:stockflow/transactions/domain/entities/transaction_entity.dart';
 import 'package:stockflow/transactions/presentation/widgets/transaction_tile.dart';
 import 'package:stockflow/transactions/presentation/widgets/transactions_empty_state.dart';
 
@@ -13,8 +12,8 @@ class TransactionsList extends StatelessWidget {
     required this.onDelete,
   });
 
-  final List<Transaction> data;
-  final ValueChanged<Transaction> onDelete;
+  final List<TransactionEntity> data;
+  final ValueChanged<TransactionEntity> onDelete;
 
   @override
   Widget build(BuildContext context) {

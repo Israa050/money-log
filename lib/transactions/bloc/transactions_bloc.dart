@@ -2,16 +2,21 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:stockflow/transactions/data/models/transactions.dart';
-import 'package:stockflow/transactions/data/repos/transactions_repository.dart';
-import 'package:stockflow/transactions/data/transactions_data_source.dart';
+import 'package:stockflow/transactions/domain/entities/transaction_entity.dart';
+import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
+import 'package:stockflow/transactions/domain/usecases/add_transaction_usecase.dart';
+import 'package:stockflow/transactions/domain/usecases/delete_transaction_usecase.dart';
+import 'package:stockflow/transactions/domain/usecases/get_transactions_usecase.dart';
 
 part 'transactions_event.dart';
 part 'transactions_state.dart';
 
 class TransactionsBloc extends Bloc<TransactionsEvent, TransactionsState> {
-  TransactionsBloc({required this.transactionsRepository})
-    : super(TransactionsInitial()) {
+  TransactionsBloc({
+    required this.getTransactionsUseCase,
+    required this.addTransactionUseCase,
+    required this.deleteTransactionUseCase,
+  }) : super(TransactionsInitial()) {
     on<AppLaunchEvent>(_onLaunch);
     on<_TransactionsUpdated>(_onTransactionsUpdated);
     on<_TransactionsFailed>(_onTransactionsFailed);
@@ -19,12 +24,15 @@ class TransactionsBloc extends Bloc<TransactionsEvent, TransactionsState> {
     on<DeleteTransactionEvent>(_onDeleteTransaction);
   }
 
-  final TransactionsRepository transactionsRepository;
-  StreamSubscription<List<Transaction>>? _subscription;
+  final GetTransactionsUseCase getTransactionsUseCase;
+  final AddTransactionUseCase addTransactionUseCase;
+  final DeleteTransactionUseCase deleteTransactionUseCase;
+
+  StreamSubscription<List<TransactionEntity>>? _subscription;
 
   void _onLaunch(AppLaunchEvent event, Emitter<TransactionsState> emit) {
     if (_subscription != null) return;
-    _subscription = transactionsRepository.getAllTransactions().listen(
+    _subscription = getTransactionsUseCase().listen(
       (items) => add(_TransactionsUpdated(data: items)),
       onError: (Object e) => add(_TransactionsFailed(message: e.toString())),
     );
@@ -48,12 +56,11 @@ class TransactionsBloc extends Bloc<TransactionsEvent, TransactionsState> {
     AddTransactionEvent event,
     Emitter<TransactionsState> emit,
   ) async {
-    final entry = transactionsRepository.newTransactionEntry(
+    final addResult = await addTransactionUseCase(
       amountMinor: event.amountMinor,
       type: event.type,
       note: event.note,
     );
-    final addResult = await transactionsRepository.addTransaction(entry);
     addResult.when(
       success: (_) {},
       failure: (message) =>
@@ -65,9 +72,7 @@ class TransactionsBloc extends Bloc<TransactionsEvent, TransactionsState> {
     DeleteTransactionEvent event,
     Emitter<TransactionsState> emit,
   ) async {
-    final deleteResult = await transactionsRepository.deleteTransaction(
-      event.id,
-    );
+    final deleteResult = await deleteTransactionUseCase(event.id);
     deleteResult.when(
       success: (_) {},
       failure: (message) =>
@@ -75,10 +80,10 @@ class TransactionsBloc extends Bloc<TransactionsEvent, TransactionsState> {
     );
   }
 
-  List<Transaction> get _currentData => switch (state) {
+  List<TransactionEntity> get _currentData => switch (state) {
     Loaded(:final data) => data,
     TransactionsError(:final previousData) => previousData,
-    TransactionsInitial() => <Transaction>[],
+    TransactionsInitial() => <TransactionEntity>[],
   };
 
   @override
