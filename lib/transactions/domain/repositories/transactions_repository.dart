@@ -11,6 +11,7 @@ abstract class TransactionsRepository {
     required int amountMinor,
     required TransactionType type,
     String? note,
+    String? categoryId,
   });
 
   Future<Result<int>> deleteTransaction(String id);

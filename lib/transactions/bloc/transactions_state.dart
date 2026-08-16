@@ -7,8 +7,9 @@ final class TransactionsInitial extends TransactionsState {}
 
 final class Loaded extends TransactionsState {
   final List<TransactionEntity> data;
+  final List<CategoryEntity> categories;
 
-  Loaded({required this.data});
+  Loaded({required this.data, required this.categories});
 }
 
 final class TransactionsError extends TransactionsState {

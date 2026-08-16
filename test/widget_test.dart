@@ -5,11 +5,14 @@ import 'package:stockflow/core/service_locator.dart';
 import 'package:stockflow/main.dart';
 import 'package:stockflow/transactions/bloc/balance_cubit.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
+import 'package:stockflow/transactions/data/repos/category_repository_impl.dart';
 import 'package:stockflow/transactions/data/repos/transactions_repository_impl.dart';
 import 'package:stockflow/transactions/data/transactions_data_source.dart';
+import 'package:stockflow/transactions/domain/repositories/category_repository.dart';
 import 'package:stockflow/transactions/domain/repositories/transactions_repository.dart';
 import 'package:stockflow/transactions/domain/usecases/add_transaction_usecase.dart';
 import 'package:stockflow/transactions/domain/usecases/delete_transaction_usecase.dart';
+import 'package:stockflow/transactions/domain/usecases/get_categories_usecase.dart';
 import 'package:stockflow/transactions/domain/usecases/get_transactions_usecase.dart';
 import 'package:stockflow/transactions/domain/usecases/watch_balance_usecase.dart';
 import 'package:stockflow/transactions/presentation/screens/transactions_screen.dart';
@@ -25,8 +28,14 @@ void main() {
     getIt.registerSingleton<TransactionsRepository>(
       TransactionsRepositoryImpl(dataSource: dataSource),
     );
+    getIt.registerSingleton<CategoryRepository>(
+      CategoryRepositoryImpl(dataSource: dataSource),
+    );
     getIt.registerSingleton<GetTransactionsUseCase>(
       GetTransactionsUseCase(getIt<TransactionsRepository>()),
+    );
+    getIt.registerSingleton<GetCategoriesUseCase>(
+      GetCategoriesUseCase(getIt<CategoryRepository>()),
     );
     getIt.registerSingleton<WatchBalanceUseCase>(
       WatchBalanceUseCase(getIt<TransactionsRepository>()),
@@ -42,6 +51,7 @@ void main() {
         getTransactionsUseCase: getIt<GetTransactionsUseCase>(),
         addTransactionUseCase: getIt<AddTransactionUseCase>(),
         deleteTransactionUseCase: getIt<DeleteTransactionUseCase>(),
+        getCategoriesUseCase: getIt<GetCategoriesUseCase>(),
       ),
     );
     getIt.registerFactory<BalanceCubit>(

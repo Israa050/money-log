@@ -38,12 +38,14 @@ class TransactionsRepositoryImpl extends TransactionsRepository {
     required int amountMinor,
     required TransactionType type,
     String? note,
+    String? categoryId,
   }) async {
     final entry = TransactionsCompanion.insert(
       id: const Uuid().v4(),
       amountMinor: amountMinor,
       type: type,
       note: Value(note),
+      categoryId: Value(categoryId),
     );
     try {
       await dataSource.addTransaction(entry);

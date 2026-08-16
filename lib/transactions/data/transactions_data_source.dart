@@ -5,6 +5,29 @@ import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
 
 part 'transactions_data_source.g.dart';
 
+final _defaultCategories = [
+  CategoriesCompanion.insert(
+    id: 'default-food',
+    name: 'Food',
+    colorHex: const Value('#FF9800'),
+  ),
+  CategoriesCompanion.insert(
+    id: 'default-transport',
+    name: 'Transport',
+    colorHex: const Value('#2196F3'),
+  ),
+  CategoriesCompanion.insert(
+    id: 'default-shopping',
+    name: 'Shopping',
+    colorHex: const Value('#9C27B0'),
+  ),
+  CategoriesCompanion.insert(
+    id: 'default-bills',
+    name: 'Bills',
+    colorHex: const Value('#F44336'),
+  ),
+];
+
 @DriftDatabase(tables: [Transactions, Categories])
 class TransactionsDataSource extends _$TransactionsDataSource {
   TransactionsDataSource(super.executor);
@@ -14,6 +37,10 @@ class TransactionsDataSource extends _$TransactionsDataSource {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (m) async {
+      await m.createAll();
+      await batch((b) => b.insertAll(categories, _defaultCategories));
+    },
     onUpgrade: (m, from, to) async {
       if (from < 2) {
         await m.createTable(categories);
@@ -54,5 +81,9 @@ class TransactionsDataSource extends _$TransactionsDataSource {
       final expense = row.read(expenseSum) ?? 0;
       return income - expense;
     });
+  }
+
+  Future<List<Category>> get allCategories {
+    return select(categories).get();
   }
 }
