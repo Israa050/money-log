@@ -1,0 +1,10 @@
+targets:
+  $default:
+    builders:
+      drift_dev:
+        options:
+          # Generates a `data class` + companion for each table (already default, kept explicit).
+          write_from_json_string_constructor: true
+          # Store DateTime columns as ISO8601 text instead of unix timestamps.
+          # Remove this if you want the (faster, default) unix-timestamp storage.
+          # store_date_time_values_as_text: true
