@@ -9,8 +9,7 @@ class Transactions extends Table {
   TextColumn get note => text().nullable()();
   late final occurredTime = dateTime().withDefault(currentDateAndTime)();
   late final creationTime = dateTime().withDefault(currentDateAndTime)();
-  TextColumn get categoryId =>
-    text().nullable().references(Categories, #id)();
+  TextColumn get categoryId => text().nullable().references(Categories, #id)();
 
   @override
   Set<Column> get primaryKey => {id};

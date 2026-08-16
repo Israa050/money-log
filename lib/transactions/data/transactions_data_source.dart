@@ -13,16 +13,16 @@ class TransactionsDataSource extends _$TransactionsDataSource {
   int get schemaVersion => 2;
 
   @override
-  MigrationStrategy get migration  => MigrationStrategy(
+  MigrationStrategy get migration => MigrationStrategy(
     onUpgrade: (m, from, to) async {
-    if (from < 2) {
-       await m.createTable(categories);
-       await m.addColumn(transactions, transactions.categoryId);
-    }
-  },
-   beforeOpen: (details) async {
-    await customStatement('PRAGMA foreign_keys = ON');
-  },
+      if (from < 2) {
+        await m.createTable(categories);
+        await m.addColumn(transactions, transactions.categoryId);
+      }
+    },
+    beforeOpen: (details) async {
+      await customStatement('PRAGMA foreign_keys = ON');
+    },
   );
 
   Stream<List<Transaction>> get allTransactions {
