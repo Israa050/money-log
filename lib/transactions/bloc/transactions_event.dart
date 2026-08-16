@@ -19,11 +19,13 @@ final class AddTransactionEvent extends TransactionsEvent {
   final int amountMinor;
   final TransactionType type;
   final String? note;
+  final String? categoryId;
 
   AddTransactionEvent({
     required this.amountMinor,
     required this.type,
     this.note,
+    this.categoryId,
   });
 }
 

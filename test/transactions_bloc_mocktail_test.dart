@@ -12,6 +12,7 @@ void main() {
   late MockGetTransactionsUseCase getTransactionsUseCase;
   late MockAddTransactionUseCase addTransactionUseCase;
   late MockDeleteTransactionUseCase deleteTransactionUseCase;
+  late MockGetCategoriesUseCase getCategoriesUseCase;
   late TransactionsBloc transactionsBloc;
 
   final fakeTransactions = [
@@ -35,10 +36,13 @@ void main() {
     getTransactionsUseCase = MockGetTransactionsUseCase();
     addTransactionUseCase = MockAddTransactionUseCase();
     deleteTransactionUseCase = MockDeleteTransactionUseCase();
+    getCategoriesUseCase = MockGetCategoriesUseCase();
+    when(() => getCategoriesUseCase()).thenAnswer((_) async => []);
     transactionsBloc = TransactionsBloc(
       getTransactionsUseCase: getTransactionsUseCase,
       addTransactionUseCase: addTransactionUseCase,
       deleteTransactionUseCase: deleteTransactionUseCase,
+      getCategoriesUseCase: getCategoriesUseCase,
     );
     registerFallbackValue(TransactionType.expense);
   });
@@ -163,7 +167,7 @@ void main() {
         ).thenAnswer((_) async => const Failure('Failed To Load'));
       },
       build: () => transactionsBloc,
-      seed: () => Loaded(data: fakeTransactions),
+      seed: () => Loaded(data: fakeTransactions, categories: const []),
       act: (bloc) => bloc.add(
         AddTransactionEvent(
           amountMinor: 500,
@@ -227,7 +231,7 @@ void main() {
         ).thenAnswer((_) async => const Failure('Data cannot be deleted'));
       },
       build: () => transactionsBloc,
-      seed: () => Loaded(data: fakeTransactions),
+      seed: () => Loaded(data: fakeTransactions, categories: const []),
       act: (bloc) => bloc.add(DeleteTransactionEvent(id: '1234')),
       expect: () => [
         isA<TransactionsError>()

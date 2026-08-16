@@ -1,12 +1,15 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
+import 'package:stockflow/transactions/data/repos/category_repository_impl.dart';
 import 'package:stockflow/transactions/data/repos/transactions_repository_impl.dart';
 import 'package:stockflow/transactions/data/transactions_data_source.dart';
 import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
+import 'package:stockflow/transactions/domain/repositories/category_repository.dart';
 import 'package:stockflow/transactions/domain/repositories/transactions_repository.dart';
 import 'package:stockflow/transactions/domain/usecases/add_transaction_usecase.dart';
 import 'package:stockflow/transactions/domain/usecases/delete_transaction_usecase.dart';
+import 'package:stockflow/transactions/domain/usecases/get_categories_usecase.dart';
 import 'package:stockflow/transactions/domain/usecases/get_transactions_usecase.dart';
 
 // Not using bloc_test/mocktail here (neither is a dev_dependency yet) --
@@ -25,21 +28,26 @@ import 'package:stockflow/transactions/domain/usecases/get_transactions_usecase.
 void main() {
   late TransactionsDataSource dataSource;
   late TransactionsRepository repository;
+  late CategoryRepository categoryRepository;
   late GetTransactionsUseCase getTransactionsUseCase;
   late AddTransactionUseCase addTransactionUseCase;
   late DeleteTransactionUseCase deleteTransactionUseCase;
+  late GetCategoriesUseCase getCategoriesUseCase;
   late TransactionsBloc bloc;
 
   setUp(() {
     dataSource = TransactionsDataSource(NativeDatabase.memory());
     repository = TransactionsRepositoryImpl(dataSource: dataSource);
+    categoryRepository = CategoryRepositoryImpl(dataSource: dataSource);
     getTransactionsUseCase = GetTransactionsUseCase(repository);
     addTransactionUseCase = AddTransactionUseCase(repository);
     deleteTransactionUseCase = DeleteTransactionUseCase(repository);
+    getCategoriesUseCase = GetCategoriesUseCase(categoryRepository);
     bloc = TransactionsBloc(
       getTransactionsUseCase: getTransactionsUseCase,
       addTransactionUseCase: addTransactionUseCase,
       deleteTransactionUseCase: deleteTransactionUseCase,
+      getCategoriesUseCase: getCategoriesUseCase,
     );
   });
 

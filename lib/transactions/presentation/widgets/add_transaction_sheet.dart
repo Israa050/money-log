@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stockflow/core/theme/app_colors.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
+import 'package:stockflow/transactions/domain/entities/category_entity.dart';
 import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
 import 'package:stockflow/transactions/presentation/format.dart';
 
@@ -29,12 +30,19 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
   final _noteController = TextEditingController();
   TransactionType _type = TransactionType.expense;
   bool _isSubmitting = false;
+  String? _categoryId;
 
   @override
   void dispose() {
     _amountController.dispose();
     _noteController.dispose();
     super.dispose();
+  }
+
+  Color? _parseHex(String? hex) {
+    if (hex == null) return null;
+    final value = int.tryParse(hex.replaceFirst('#', 'FF'), radix: 16);
+    return value == null ? null : Color(value);
   }
 
   void _submit() {
@@ -52,6 +60,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
         amountMinor: amountMinor,
         type: _type,
         note: note.isEmpty ? null : note,
+        categoryId: _categoryId,
       ),
     );
   }
@@ -59,7 +68,8 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
-
+    final state = context.watch<TransactionsBloc>().state;
+    final categories = state is Loaded ? state.categories : <CategoryEntity>[];
     return Container(
       decoration: BoxDecoration(
         color: colors.surfaceRaised,
@@ -128,6 +138,29 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                     setState(() => _type = selection.first),
               ),
               const SizedBox(height: 16),
+              if (categories.isNotEmpty) ...[
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: categories.map((category) {
+                    final categoryColor = _parseHex(category.colorHex);
+                    return ChoiceChip(
+                      avatar: categoryColor == null
+                          ? null
+                          : CircleAvatar(backgroundColor: categoryColor),
+                      label: Text(category.name),
+                      selected: _categoryId == category.id,
+                      selectedColor: categoryColor?.withValues(alpha: 0.3),
+                      onSelected: (selected) {
+                        setState(
+                          () => _categoryId = selected ? category.id : null,
+                        );
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+              ],
               TextFormField(
                 controller: _amountController,
                 keyboardType: const TextInputType.numberWithOptions(

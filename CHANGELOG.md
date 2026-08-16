@@ -3,6 +3,18 @@
 Notes for each build pushed to `production`. The top entry is what
 Firebase App Distribution shows testers for the current release.
 
+## Unreleased
+
+- Added categories: a `Categories` Drift table with a nullable FK on
+  `transactions.categoryId`, four default categories (Food, Transport,
+  Shopping, Bills) seeded on database creation, a `CategoryRepository` +
+  `GetCategoriesUseCase` mirroring the transactions domain/data split, and a
+  color-coded category picker in the add-transaction sheet, sourced from
+  `TransactionsBloc` state.
+- Not yet surfaced: editing/managing categories, and showing the assigned
+  category on existing transaction rows — only the add-transaction picker
+  exists so far.
+
 ## v0.2.0+2
 
 - Fixed a typo in the Drift schema: `occuredTime` → `occurredTime` (column

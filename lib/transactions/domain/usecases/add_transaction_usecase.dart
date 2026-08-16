@@ -11,11 +11,13 @@ class AddTransactionUseCase {
     required int amountMinor,
     required TransactionType type,
     String? note,
+    String? categoryId,
   }) {
     return _repository.addTransaction(
       amountMinor: amountMinor,
       type: type,
       note: note,
+      categoryId: categoryId,
     );
   }
 }
