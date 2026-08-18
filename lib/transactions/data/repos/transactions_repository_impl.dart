@@ -18,6 +18,7 @@ class TransactionsRepositoryImpl extends TransactionsRepository {
       type: row.type,
       note: row.note ?? '',
       timestamp: row.occurredTime,
+      categoryId: row.categoryId,
     );
   }
 

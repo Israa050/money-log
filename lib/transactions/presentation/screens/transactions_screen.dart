@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
+import 'package:stockflow/transactions/domain/entities/category_entity.dart';
 import 'package:stockflow/transactions/domain/entities/transaction_entity.dart';
 import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
 import 'package:stockflow/transactions/presentation/widgets/add_transaction_sheet.dart';
@@ -79,6 +80,10 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             Loaded(:final data) => data,
             TransactionsError(:final previousData) => previousData,
           };
+          final categories = switch (state) {
+            Loaded(:final categories) => categories,
+            _ => const <CategoryEntity>[],
+          };
 
           if (state is TransactionsError) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -127,6 +132,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 child: TransactionsList(
                   data: data,
                   onDelete: _handleSwipeToDelete,
+                  categories: categories,
                 ),
               ),
             ],
