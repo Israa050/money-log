@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:stockflow/core/service_locator.dart';
 import 'package:stockflow/main.dart';
 import 'package:stockflow/transactions/bloc/balance_cubit.dart';
+import 'package:stockflow/transactions/bloc/category_totals_cubit.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
 import 'package:stockflow/transactions/data/repos/category_repository_impl.dart';
 import 'package:stockflow/transactions/data/repos/transactions_repository_impl.dart';
@@ -15,6 +16,7 @@ import 'package:stockflow/transactions/domain/usecases/delete_transaction_usecas
 import 'package:stockflow/transactions/domain/usecases/get_categories_usecase.dart';
 import 'package:stockflow/transactions/domain/usecases/get_transactions_usecase.dart';
 import 'package:stockflow/transactions/domain/usecases/watch_balance_usecase.dart';
+import 'package:stockflow/transactions/domain/usecases/watch_category_totals_usecase.dart';
 import 'package:stockflow/transactions/presentation/screens/transactions_screen.dart';
 
 void main() {
@@ -40,6 +42,11 @@ void main() {
     getIt.registerSingleton<WatchBalanceUseCase>(
       WatchBalanceUseCase(getIt<TransactionsRepository>()),
     );
+    getIt.registerSingleton<WatchCategoryTotalsUsecase>(
+      WatchCategoryTotalsUsecase(
+        categoryRepository: getIt<CategoryRepository>(),
+      ),
+    );
     getIt.registerSingleton<AddTransactionUseCase>(
       AddTransactionUseCase(getIt<TransactionsRepository>()),
     );
@@ -56,6 +63,11 @@ void main() {
     );
     getIt.registerFactory<BalanceCubit>(
       () => BalanceCubit(watchBalanceUseCase: getIt<WatchBalanceUseCase>()),
+    );
+    getIt.registerFactory<CategoryTotalsCubit>(
+      () => CategoryTotalsCubit(
+        watchCategoryTotals: getIt<WatchCategoryTotalsUsecase>(),
+      ),
     );
 
     addTearDown(() async {

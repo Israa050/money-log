@@ -4,6 +4,7 @@ import 'package:stockflow/core/app_bloc_observer.dart';
 import 'package:stockflow/core/service_locator.dart';
 import 'package:stockflow/core/theme/app_theme.dart';
 import 'package:stockflow/transactions/bloc/balance_cubit.dart';
+import 'package:stockflow/transactions/bloc/category_totals_cubit.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
 import 'package:stockflow/transactions/presentation/screens/transactions_screen.dart';
 
@@ -28,6 +29,7 @@ class MyApp extends StatelessWidget {
         providers: [
           BlocProvider(create: (_) => getIt<TransactionsBloc>()),
           BlocProvider(create: (_) => getIt<BalanceCubit>()),
+          BlocProvider(create: (_) => getIt<CategoryTotalsCubit>()),
         ],
         child: const TransactionsScreen(),
       ),
