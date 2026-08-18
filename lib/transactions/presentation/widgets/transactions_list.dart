@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:stockflow/transactions/domain/entities/category_entity.dart';
 import 'package:stockflow/transactions/domain/entities/transaction_entity.dart';
 import 'package:stockflow/transactions/presentation/widgets/transaction_tile.dart';
 import 'package:stockflow/transactions/presentation/widgets/transactions_empty_state.dart';
@@ -10,14 +11,18 @@ class TransactionsList extends StatelessWidget {
     super.key,
     required this.data,
     required this.onDelete,
+    required this.categories,
   });
 
   final List<TransactionEntity> data;
   final ValueChanged<TransactionEntity> onDelete;
+  final List<CategoryEntity> categories;
 
   @override
   Widget build(BuildContext context) {
     if (data.isEmpty) return const TransactionsEmptyState();
+
+    final categoriesById = {for (final c in categories) c.id: c};
 
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -28,6 +33,7 @@ class TransactionsList extends StatelessWidget {
         return TransactionTile(
           transaction: transaction,
           onDelete: () => onDelete(transaction),
+          category: categoriesById[transaction.categoryId],
         );
       },
     );

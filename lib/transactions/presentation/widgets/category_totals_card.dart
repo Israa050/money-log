@@ -6,9 +6,17 @@ import 'package:stockflow/transactions/domain/entities/category_total_entity.dar
 import 'package:stockflow/transactions/presentation/format.dart';
 
 /// Card showing total expense per category, reactively updated from
-/// [CategoryTotalsCubit]. Styled to match [BalanceSummaryCard].
-class CategoryTotalsCard extends StatelessWidget {
+/// [CategoryTotalsCubit]. Styled to match [BalanceSummaryCard]. Collapsible
+/// to free up vertical space for the transaction list below it.
+class CategoryTotalsCard extends StatefulWidget {
   const CategoryTotalsCard({super.key});
+
+  @override
+  State<CategoryTotalsCard> createState() => _CategoryTotalsCardState();
+}
+
+class _CategoryTotalsCardState extends State<CategoryTotalsCard> {
+  bool _expanded = true;
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +25,7 @@ class CategoryTotalsCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+        padding: EdgeInsets.fromLTRB(18, 16, 18, _expanded ? 8 : 16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: colors.lineSoft),
@@ -36,44 +44,79 @@ class CategoryTotalsCard extends StatelessWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'SPENDING BY CATEGORY',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1.0,
-                        color: colors.inkFaint,
+                InkWell(
+                  onTap: () => setState(() => _expanded = !_expanded),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'SPENDING BY CATEGORY',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.0,
+                          color: colors.inkFaint,
+                        ),
                       ),
-                    ),
-                    Text(
-                      formatAmountMinor(grandTotal),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: colors.inkSoft,
+                      Row(
+                        children: [
+                          Text(
+                            formatAmountMinor(grandTotal),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: colors.inkSoft,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          AnimatedRotation(
+                            turns: _expanded ? 0.5 : 0,
+                            duration: const Duration(milliseconds: 200),
+                            child: Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              size: 18,
+                              color: colors.inkFaint,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                if (sorted.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    child: Text(
-                      'No expenses yet',
-                      style: TextStyle(fontSize: 12.5, color: colors.inkFaint),
-                    ),
-                  )
-                else
-                  ...sorted.map(
-                    (entity) => _CategoryTotalRow(
-                      entity: entity,
-                      maxTotalMinor: sorted.first.totalMinor,
-                    ),
+                    ],
                   ),
+                ),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment.topCenter,
+                  child: !_expanded
+                      ? const SizedBox(width: double.infinity)
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 10),
+                            if (sorted.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                child: Text(
+                                  'No expenses yet',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    color: colors.inkFaint,
+                                  ),
+                                ),
+                              )
+                            else
+                              ...sorted.map(
+                                (entity) => _CategoryTotalRow(
+                                  entity: entity,
+                                  maxTotalMinor: sorted.first.totalMinor,
+                                ),
+                              ),
+                          ],
+                        ),
+                ),
               ],
             );
           },

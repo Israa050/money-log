@@ -6,6 +6,7 @@ class TransactionEntity {
   final TransactionType type;
   final String? note;
   final DateTime timestamp;
+  final String? categoryId;
 
   TransactionEntity({
     required this.id,
@@ -13,5 +14,6 @@ class TransactionEntity {
     required this.type,
     required this.note,
     required this.timestamp,
+    required this.categoryId,
   });
 }

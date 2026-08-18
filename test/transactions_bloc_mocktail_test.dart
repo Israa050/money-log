@@ -22,6 +22,7 @@ void main() {
       type: TransactionType.expense,
       note: 'coffee',
       timestamp: DateTime(2024, 1, 1),
+      categoryId: 'default-food',
     ),
     TransactionEntity(
       id: 't2',
@@ -29,6 +30,7 @@ void main() {
       type: TransactionType.income,
       note: null,
       timestamp: DateTime(2024, 1, 2),
+      categoryId: null,
     ),
   ];
 

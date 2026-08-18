@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:stockflow/core/theme/app_colors.dart';
+import 'package:stockflow/transactions/domain/entities/category_entity.dart';
 import 'package:stockflow/transactions/domain/entities/transaction_entity.dart';
 import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
 import 'package:stockflow/transactions/presentation/format.dart';
@@ -9,10 +10,18 @@ class TransactionTile extends StatelessWidget {
     super.key,
     required this.transaction,
     required this.onDelete,
+    this.category,
   });
 
   final TransactionEntity transaction;
   final VoidCallback onDelete;
+  final CategoryEntity? category;
+
+  Color? _parseHex(String? hex) {
+    if (hex == null) return null;
+    final value = int.tryParse(hex.replaceFirst('#', 'FF'), radix: 16);
+    return value == null ? null : Color(value);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +30,7 @@ class TransactionTile extends StatelessWidget {
     final color = isIncome ? colors.income : colors.expense;
     final wash = isIncome ? colors.incomeWash : colors.expenseWash;
     final sign = isIncome ? '+' : '-';
+    final categoryColor = _parseHex(category?.colorHex);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
@@ -65,17 +75,30 @@ class TransactionTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      transaction.note?.isNotEmpty == true
-                          ? transaction.note!
-                          : (isIncome ? 'Income' : 'Expense'),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: colors.ink,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            transaction.note?.isNotEmpty == true
+                                ? transaction.note!
+                                : (isIncome ? 'Income' : 'Expense'),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: colors.ink,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (category != null) ...[
+                          const SizedBox(width: 6),
+                          _CategoryPill(
+                            name: category!.name,
+                            color: categoryColor,
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 1),
                     Text(
@@ -97,6 +120,48 @@ class TransactionTile extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _CategoryPill extends StatelessWidget {
+  const _CategoryPill({required this.name, required this.color});
+
+  final String name;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(6, 2, 8, 2),
+      decoration: BoxDecoration(
+        color: colors.lineSoft,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: color ?? colors.inkFaint,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            name,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+              color: colors.inkFaint,
+            ),
+          ),
+        ],
       ),
     );
   }
