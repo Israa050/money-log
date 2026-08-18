@@ -95,110 +95,114 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
         },
         child: Form(
           key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: colors.line,
-                    borderRadius: BorderRadius.circular(2),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: colors.line,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              Text(
-                'Add transaction',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16.5,
-                  fontWeight: FontWeight.w700,
-                  color: colors.ink,
+                Text(
+                  'Add transaction',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w700,
+                    color: colors.ink,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 18),
-              SegmentedButton<TransactionType>(
-                segments: const [
-                  ButtonSegment(
-                    value: TransactionType.expense,
-                    label: Text('Expense'),
-                    icon: Icon(Icons.remove),
-                  ),
-                  ButtonSegment(
-                    value: TransactionType.income,
-                    label: Text('Income'),
-                    icon: Icon(Icons.add),
-                  ),
-                ],
-                selected: {_type},
-                onSelectionChanged: (selection) =>
-                    setState(() => _type = selection.first),
-              ),
-              const SizedBox(height: 16),
-              if (categories.isNotEmpty) ...[
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: categories.map((category) {
-                    final categoryColor = _parseHex(category.colorHex);
-                    return ChoiceChip(
-                      avatar: categoryColor == null
-                          ? null
-                          : CircleAvatar(backgroundColor: categoryColor),
-                      label: Text(category.name),
-                      selected: _categoryId == category.id,
-                      selectedColor: categoryColor?.withValues(alpha: 0.3),
-                      onSelected: (selected) {
-                        setState(
-                          () => _categoryId = selected ? category.id : null,
-                        );
-                      },
-                    );
-                  }).toList(),
+                const SizedBox(height: 18),
+                SegmentedButton<TransactionType>(
+                  segments: const [
+                    ButtonSegment(
+                      value: TransactionType.expense,
+                      label: Text('Expense'),
+                      icon: Icon(Icons.remove),
+                    ),
+                    ButtonSegment(
+                      value: TransactionType.income,
+                      label: Text('Income'),
+                      icon: Icon(Icons.add),
+                    ),
+                  ],
+                  selected: {_type},
+                  onSelectionChanged: (selection) =>
+                      setState(() => _type = selection.first),
                 ),
                 const SizedBox(height: 16),
+                if (categories.isNotEmpty) ...[
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: categories.map((category) {
+                      final categoryColor = _parseHex(category.colorHex);
+                      return ChoiceChip(
+                        avatar: categoryColor == null
+                            ? null
+                            : CircleAvatar(backgroundColor: categoryColor),
+                        label: Text(category.name),
+                        selected: _categoryId == category.id,
+                        selectedColor: categoryColor?.withValues(alpha: 0.3),
+                        onSelected: (selected) {
+                          setState(
+                            () => _categoryId = selected ? category.id : null,
+                          );
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                TextFormField(
+                  controller: _amountController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Amount',
+                    prefixText: '\$',
+                  ),
+                  validator: (value) {
+                    final trimmed = value?.trim() ?? '';
+                    if (trimmed.isEmpty) return 'Enter an amount';
+                    if (parseAmountToMinor(trimmed) == null) {
+                      return 'Enter a valid positive amount';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _noteController,
+                  decoration: const InputDecoration(
+                    labelText: 'Note (optional)',
+                  ),
+                ),
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: _isSubmitting ? null : _submit,
+                  child: _isSubmitting
+                      ? SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: colors.accentInk,
+                          ),
+                        )
+                      : const Text('Save'),
+                ),
               ],
-              TextFormField(
-                controller: _amountController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(
-                  labelText: 'Amount',
-                  prefixText: '\$',
-                ),
-                validator: (value) {
-                  final trimmed = value?.trim() ?? '';
-                  if (trimmed.isEmpty) return 'Enter an amount';
-                  if (parseAmountToMinor(trimmed) == null) {
-                    return 'Enter a valid positive amount';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: _noteController,
-                decoration: const InputDecoration(labelText: 'Note (optional)'),
-              ),
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: _isSubmitting ? null : _submit,
-                child: _isSubmitting
-                    ? SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: colors.accentInk,
-                        ),
-                      )
-                    : const Text('Save'),
-              ),
-            ],
+            ),
           ),
         ),
       ),

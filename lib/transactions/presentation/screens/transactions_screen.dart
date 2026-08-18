@@ -5,6 +5,7 @@ import 'package:stockflow/transactions/domain/entities/transaction_entity.dart';
 import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
 import 'package:stockflow/transactions/presentation/widgets/add_transaction_sheet.dart';
 import 'package:stockflow/transactions/presentation/widgets/balance_summary_card.dart';
+import 'package:stockflow/transactions/presentation/widgets/category_totals_card.dart';
 import 'package:stockflow/transactions/presentation/widgets/transactions_list.dart';
 import 'package:stockflow/transactions/presentation/widgets/undo_snackbar_content.dart';
 
@@ -121,6 +122,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           return Column(
             children: [
               BalanceSummaryCard(income: income, expense: expense),
+              const CategoryTotalsCard(),
               Expanded(
                 child: TransactionsList(
                   data: data,

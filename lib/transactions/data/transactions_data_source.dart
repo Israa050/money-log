@@ -86,4 +86,51 @@ class TransactionsDataSource extends _$TransactionsDataSource {
   Future<List<Category>> get allCategories {
     return select(categories).get();
   }
+
+  Stream<List<CategoryTotalRow>> get categoryTotals {
+    final expenseSum = transactions.amountMinor.sum();
+
+    final query = selectOnly(transactions)
+      ..addColumns([
+        categories.id,
+        categories.name,
+        categories.colorHex,
+        expenseSum,
+      ])
+      ..join([
+        leftOuterJoin(
+          categories,
+          categories.id.equalsExp(transactions.categoryId),
+        ),
+      ])
+      ..where(transactions.type.equalsValue(TransactionType.expense))
+      ..groupBy([transactions.categoryId]);
+
+    return query.watch().map(
+      (rows) => rows
+          .map(
+            (row) => CategoryTotalRow(
+              categoryId: row.read(categories.id),
+              categoryName: row.read(categories.name),
+              colorHex: row.read(categories.colorHex),
+              totalMinor: row.read(expenseSum) ?? 0,
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class CategoryTotalRow {
+  CategoryTotalRow({
+    required this.categoryId,
+    required this.categoryName,
+    required this.colorHex,
+    required this.totalMinor,
+  });
+
+  final String? categoryId;
+  final String? categoryName;
+  final String? colorHex;
+  final int totalMinor;
 }

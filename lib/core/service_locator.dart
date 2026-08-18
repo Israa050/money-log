@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 import 'package:stockflow/transactions/bloc/balance_cubit.dart';
+import 'package:stockflow/transactions/bloc/category_totals_cubit.dart';
 import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
 import 'package:stockflow/transactions/data/connection.dart';
 import 'package:stockflow/transactions/data/repos/category_repository_impl.dart';
@@ -12,6 +13,7 @@ import 'package:stockflow/transactions/domain/usecases/delete_transaction_usecas
 import 'package:stockflow/transactions/domain/usecases/get_categories_usecase.dart';
 import 'package:stockflow/transactions/domain/usecases/get_transactions_usecase.dart';
 import 'package:stockflow/transactions/domain/usecases/watch_balance_usecase.dart';
+import 'package:stockflow/transactions/domain/usecases/watch_category_totals_usecase.dart';
 
 final getIt = GetIt.instance;
 
@@ -41,6 +43,12 @@ void setupServiceLocator() {
     () => WatchBalanceUseCase(getIt<TransactionsRepository>()),
   );
 
+  getIt.registerLazySingleton<WatchCategoryTotalsUsecase>(
+    () => WatchCategoryTotalsUsecase(
+      categoryRepository: getIt<CategoryRepository>(),
+    ),
+  );
+
   getIt.registerLazySingleton<AddTransactionUseCase>(
     () => AddTransactionUseCase(getIt<TransactionsRepository>()),
   );
@@ -60,5 +68,11 @@ void setupServiceLocator() {
 
   getIt.registerFactory<BalanceCubit>(
     () => BalanceCubit(watchBalanceUseCase: getIt<WatchBalanceUseCase>()),
+  );
+
+  getIt.registerFactory<CategoryTotalsCubit>(
+    () => CategoryTotalsCubit(
+      watchCategoryTotals: getIt<WatchCategoryTotalsUsecase>(),
+    ),
   );
 }
