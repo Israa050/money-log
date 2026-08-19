@@ -11,9 +11,17 @@ Firebase App Distribution shows testers for the current release.
   `GetCategoriesUseCase` mirroring the transactions domain/data split, and a
   color-coded category picker in the add-transaction sheet, sourced from
   `TransactionsBloc` state.
-- Not yet surfaced: editing/managing categories, and showing the assigned
-  category on existing transaction rows — only the add-transaction picker
-  exists so far.
+- Added reactive total spending per category: a Drift `leftOuterJoin` +
+  `groupBy` query groups expense transactions by category (uncategorized
+  spend included as its own bucket), wired through `CategoryRepository`,
+  `WatchCategoryTotalsUsecase`, and a new `CategoryTotalsCubit` to a
+  collapsible `CategoryTotalsCard` on the transactions screen.
+- Transaction rows now show a color-coded category tag next to the title
+  when a category is set, resolved from the same category list already
+  loaded for the add-transaction picker.
+- Fixed a bottom-sheet overflow in the add-transaction form by making its
+  content scrollable, so it no longer clips when the keyboard is open.
+- Not yet surfaced: editing/managing categories.
 
 ## v0.2.0+2
 
