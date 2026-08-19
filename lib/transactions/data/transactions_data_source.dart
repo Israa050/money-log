@@ -33,7 +33,7 @@ class TransactionsDataSource extends _$TransactionsDataSource {
   TransactionsDataSource(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -45,6 +45,9 @@ class TransactionsDataSource extends _$TransactionsDataSource {
       if (from < 2) {
         await m.createTable(categories);
         await m.addColumn(transactions, transactions.categoryId);
+      }
+      if (from < 3) {
+        await m.alterTable(TableMigration(transactions));
       }
     },
     beforeOpen: (details) async {
@@ -83,8 +86,29 @@ class TransactionsDataSource extends _$TransactionsDataSource {
     });
   }
 
-  Future<List<Category>> get allCategories {
-    return select(categories).get();
+  Stream<List<Category>> get watchAllCategories {
+    return select(categories).watch();
+  }
+
+  Future<int> addCategory(CategoriesCompanion entry) {
+    return into(categories).insert(entry);
+  }
+
+  Future<int> deleteCategory(String id) {
+    return (delete(categories)..where((item) => item.id.equals(id))).go();
+  }
+
+  Future<bool> updateCategory(CategoriesCompanion entry) {
+    return update(categories).replace(entry);
+  }
+
+  Future<Category?> findCategoryByName(String name) {
+    // .equals() is case-sensitive (SQLite's default BINARY collation), but
+    // duplicate-name checks in the repository are meant to be
+    // case-insensitive, so compare lowercased on both sides.
+    return (select(categories)
+          ..where((c) => c.name.lower().equals(name.toLowerCase())))
+        .getSingleOrNull();
   }
 
   Stream<List<CategoryTotalRow>> get categoryTotals {

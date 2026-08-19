@@ -15,6 +15,11 @@ final class _TransactionsFailed extends TransactionsEvent {
   _TransactionsFailed({required this.message});
 }
 
+final class _CategoriesUpdated extends TransactionsEvent {
+  final List<CategoryEntity> data;
+  _CategoriesUpdated({required this.data});
+}
+
 final class AddTransactionEvent extends TransactionsEvent {
   final int amountMinor;
   final TransactionType type;

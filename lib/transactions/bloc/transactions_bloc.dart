@@ -7,8 +7,8 @@ import 'package:stockflow/transactions/domain/entities/transaction_entity.dart';
 import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
 import 'package:stockflow/transactions/domain/usecases/add_transaction_usecase.dart';
 import 'package:stockflow/transactions/domain/usecases/delete_transaction_usecase.dart';
-import 'package:stockflow/transactions/domain/usecases/get_categories_usecase.dart';
 import 'package:stockflow/transactions/domain/usecases/get_transactions_usecase.dart';
+import 'package:stockflow/transactions/domain/usecases/watch_categories_usecase.dart';
 
 part 'transactions_event.dart';
 part 'transactions_state.dart';
@@ -18,11 +18,12 @@ class TransactionsBloc extends Bloc<TransactionsEvent, TransactionsState> {
     required this.getTransactionsUseCase,
     required this.addTransactionUseCase,
     required this.deleteTransactionUseCase,
-    required this.getCategoriesUseCase,
+    required this.watchCategoriesUseCase,
   }) : super(TransactionsInitial()) {
     on<AppLaunchEvent>(_onLaunch);
     on<_TransactionsUpdated>(_onTransactionsUpdated);
     on<_TransactionsFailed>(_onTransactionsFailed);
+    on<_CategoriesUpdated>(_onCategoriesUpdated);
     on<AddTransactionEvent>(_onAddTransaction);
     on<DeleteTransactionEvent>(_onDeleteTransaction);
   }
@@ -30,9 +31,10 @@ class TransactionsBloc extends Bloc<TransactionsEvent, TransactionsState> {
   final GetTransactionsUseCase getTransactionsUseCase;
   final AddTransactionUseCase addTransactionUseCase;
   final DeleteTransactionUseCase deleteTransactionUseCase;
-  final GetCategoriesUseCase getCategoriesUseCase;
+  final WatchCategoriesUseCase watchCategoriesUseCase;
 
   StreamSubscription<List<TransactionEntity>>? _subscription;
+  StreamSubscription<List<CategoryEntity>>? _categoriesSubscription;
   List<CategoryEntity> _categories = [];
 
   Future<void> _onLaunch(
@@ -40,7 +42,9 @@ class TransactionsBloc extends Bloc<TransactionsEvent, TransactionsState> {
     Emitter<TransactionsState> emit,
   ) async {
     if (_subscription != null) return;
-    _categories = await getCategoriesUseCase();
+    _categoriesSubscription = watchCategoriesUseCase().listen(
+      (items) => add(_CategoriesUpdated(data: items)),
+    );
     _subscription = getTransactionsUseCase().listen(
       (items) => add(_TransactionsUpdated(data: items)),
       onError: (Object e) => add(_TransactionsFailed(message: e.toString())),
@@ -59,6 +63,17 @@ class TransactionsBloc extends Bloc<TransactionsEvent, TransactionsState> {
     Emitter<TransactionsState> emit,
   ) {
     emit(TransactionsError(message: event.message, previousData: _currentData));
+  }
+
+  void _onCategoriesUpdated(
+    _CategoriesUpdated event,
+    Emitter<TransactionsState> emit,
+  ) {
+    _categories = event.data;
+    // Transactions haven't loaded yet: wait for _onTransactionsUpdated
+    // rather than emitting Loaded with a fake-empty transaction list.
+    if (state is TransactionsInitial) return;
+    emit(Loaded(data: _currentData, categories: _categories));
   }
 
   Future<void> _onAddTransaction(
@@ -99,6 +114,7 @@ class TransactionsBloc extends Bloc<TransactionsEvent, TransactionsState> {
   @override
   Future<void> close() {
     _subscription?.cancel();
+    _categoriesSubscription?.cancel();
     return super.close();
   }
 }

@@ -39,12 +39,6 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
     super.dispose();
   }
 
-  Color? _parseHex(String? hex) {
-    if (hex == null) return null;
-    final value = int.tryParse(hex.replaceFirst('#', 'FF'), radix: 16);
-    return value == null ? null : Color(value);
-  }
-
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
 
@@ -144,7 +138,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                     spacing: 8,
                     runSpacing: 4,
                     children: categories.map((category) {
-                      final categoryColor = _parseHex(category.colorHex);
+                      final categoryColor = parseHexColor(category.colorHex);
                       return ChoiceChip(
                         avatar: categoryColor == null
                             ? null

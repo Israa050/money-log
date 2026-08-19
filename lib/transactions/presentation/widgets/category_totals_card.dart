@@ -132,16 +132,10 @@ class _CategoryTotalRow extends StatelessWidget {
   final CategoryTotalEntity entity;
   final int maxTotalMinor;
 
-  Color? _parseHex(String? hex) {
-    if (hex == null) return null;
-    final value = int.tryParse(hex.replaceFirst('#', 'FF'), radix: 16);
-    return value == null ? null : Color(value);
-  }
-
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
-    final color = _parseHex(entity.colorHex);
+    final color = parseHexColor(entity.colorHex);
     final name = entity.name;
     final fraction = maxTotalMinor == 0
         ? 0.0

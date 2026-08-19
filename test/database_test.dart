@@ -22,6 +22,7 @@ void main() {
     TransactionType type = TransactionType.expense,
     Value<String?> note = const Value.absent(),
     Value<DateTime> occurredTime = const Value.absent(),
+    Value<String?> categoryId = const Value.absent(),
   }) {
     return TransactionsCompanion.insert(
       id: id,
@@ -29,7 +30,16 @@ void main() {
       type: type,
       note: note,
       occurredTime: occurredTime,
+      categoryId: categoryId,
     );
+  }
+
+  CategoriesCompanion buildCategory({
+    required String id,
+    String name = 'Category',
+    Value<String?> colorHex = const Value.absent(),
+  }) {
+    return CategoriesCompanion.insert(id: id, name: name, colorHex: colorHex);
   }
 
   group('Test Drift', () {
@@ -346,6 +356,203 @@ void main() {
           );
         },
       );
+    });
+
+    // Every test in this group runs against a database that already has
+    // the 4 seeded default categories from onCreate (unlike Transactions,
+    // which starts genuinely empty) -- so assertions filter down to the
+    // ids created within the test rather than assuming an empty table.
+    group('Categories', () {
+      group('addCategory', () {
+        test('basic insert + read-back via watchAllCategories', () async {
+          final id = const Uuid().v4();
+          await dataSource.addCategory(
+            buildCategory(
+              id: id,
+              name: 'Food',
+              colorHex: const Value('#FF0000'),
+            ),
+          );
+
+          final result = await dataSource.watchAllCategories.first;
+          final inserted = result.singleWhere((c) => c.id == id);
+          expect(inserted.name, 'Food');
+          expect(inserted.colorHex, '#FF0000');
+        });
+
+        test('colorHex omitted -> stored as null', () async {
+          final id = const Uuid().v4();
+          await dataSource.addCategory(buildCategory(id: id, name: 'Food'));
+
+          final result = await dataSource.watchAllCategories.first;
+          expect(result.singleWhere((c) => c.id == id).colorHex, null);
+        });
+
+        test('duplicate id throws; distinct ids both succeed', () async {
+          final id = const Uuid().v4();
+          await dataSource.addCategory(buildCategory(id: id));
+
+          expect(
+            () => dataSource.addCategory(buildCategory(id: id)),
+            throwsA(anything),
+          );
+
+          final secondId = const Uuid().v4();
+          await dataSource.addCategory(buildCategory(id: secondId));
+          final result = await dataSource.watchAllCategories.first;
+          expect(result.map((c) => c.id), containsAll([id, secondId]));
+        });
+      });
+
+      group('updateCategory', () {
+        test('replaces name and colorHex for a matching id', () async {
+          final id = const Uuid().v4();
+          await dataSource.addCategory(
+            buildCategory(
+              id: id,
+              name: 'Food',
+              colorHex: const Value('#FF0000'),
+            ),
+          );
+
+          await dataSource.updateCategory(
+            CategoriesCompanion(
+              id: Value(id),
+              name: const Value('Groceries'),
+              colorHex: const Value('#00FF00'),
+            ),
+          );
+
+          final result = await dataSource.watchAllCategories.first;
+          final updated = result.singleWhere((c) => c.id == id);
+          expect(updated.name, 'Groceries');
+          expect(updated.colorHex, '#00FF00');
+        });
+
+        test('non-existent id -> returns false, no row created', () async {
+          final ghostId = const Uuid().v4();
+          final updated = await dataSource.updateCategory(
+            CategoriesCompanion(
+              id: Value(ghostId),
+              name: const Value('Ghost'),
+              colorHex: const Value.absent(),
+            ),
+          );
+
+          expect(updated, isFalse);
+          final result = await dataSource.watchAllCategories.first;
+          expect(result.where((c) => c.id == ghostId), isEmpty);
+        });
+      });
+
+      group('deleteCategory', () {
+        test('deleting an existing id removes exactly that row', () async {
+          final keepId = const Uuid().v4();
+          final removeId = const Uuid().v4();
+          await dataSource.addCategory(buildCategory(id: keepId));
+          await dataSource.addCategory(buildCategory(id: removeId));
+
+          await dataSource.deleteCategory(removeId);
+
+          final result = await dataSource.watchAllCategories.first;
+          expect(result.where((c) => c.id == removeId), isEmpty);
+          expect(result.where((c) => c.id == keepId).length, 1);
+        });
+
+        test('deleting a non-existent id returns 0, does not throw', () async {
+          final deletedCount = await dataSource.deleteCategory(
+            const Uuid().v4(),
+          );
+          expect(deletedCount, 0);
+        });
+
+        test(
+          'deleting a category referenced by a transaction sets '
+          'categoryId to null instead of failing (ON DELETE SET NULL)',
+          () async {
+            final categoryId = const Uuid().v4();
+            final transactionId = const Uuid().v4();
+            await dataSource.addCategory(buildCategory(id: categoryId));
+            await dataSource.addTransaction(
+              buildEntry(id: transactionId, categoryId: Value(categoryId)),
+            );
+
+            await dataSource.deleteCategory(categoryId);
+
+            final categories = await dataSource.watchAllCategories.first;
+            expect(categories.where((c) => c.id == categoryId), isEmpty);
+
+            final transactions = await dataSource.allTransactions.first;
+            final orphaned = transactions.singleWhere(
+              (t) => t.id == transactionId,
+            );
+            expect(orphaned.categoryId, null);
+          },
+        );
+
+        test('deleting a category with no transactions attached succeeds '
+            'immediately (baseline for the orphaning test above)', () async {
+          final categoryId = const Uuid().v4();
+          await dataSource.addCategory(buildCategory(id: categoryId));
+
+          final deletedCount = await dataSource.deleteCategory(categoryId);
+
+          expect(deletedCount, 1);
+        });
+      });
+
+      group('findCategoryByName', () {
+        test('existing name -> returns the matching row', () async {
+          final id = const Uuid().v4();
+          await dataSource.addCategory(
+            buildCategory(id: id, name: 'A Unique Category Name'),
+          );
+
+          final result = await dataSource.findCategoryByName(
+            'A Unique Category Name',
+          );
+
+          expect(result?.id, id);
+        });
+
+        test('no matching name -> returns null', () async {
+          final result = await dataSource.findCategoryByName('Nonexistent');
+          expect(result, null);
+        });
+      });
+
+      group('watchAllCategories', () {
+        test(
+          'a fresh database already contains the 4 seeded default categories',
+          () async {
+            final result = await dataSource.watchAllCategories.first;
+            expect(result.map((c) => c.id), [
+              'default-food',
+              'default-transport',
+              'default-shopping',
+              'default-bills',
+            ]);
+          },
+        );
+
+        test(
+          'emits() an updated list when a row is inserted after subscribing',
+          () async {
+            final id = const Uuid().v4();
+            expectLater(
+              dataSource.watchAllCategories,
+              emitsInOrder([
+                predicate<List<Category>>((list) => list.length == 4),
+                predicate<List<Category>>(
+                  (list) => list.length == 5 && list.any((c) => c.id == id),
+                ),
+              ]),
+            );
+            await Future<void>.delayed(Duration.zero);
+            await dataSource.addCategory(buildCategory(id: id));
+          },
+        );
+      });
     });
   });
 }

@@ -12,7 +12,7 @@ void main() {
   late MockGetTransactionsUseCase getTransactionsUseCase;
   late MockAddTransactionUseCase addTransactionUseCase;
   late MockDeleteTransactionUseCase deleteTransactionUseCase;
-  late MockGetCategoriesUseCase getCategoriesUseCase;
+  late MockWatchCategoriesUseCase watchCategoriesUseCase;
   late TransactionsBloc transactionsBloc;
 
   final fakeTransactions = [
@@ -38,13 +38,13 @@ void main() {
     getTransactionsUseCase = MockGetTransactionsUseCase();
     addTransactionUseCase = MockAddTransactionUseCase();
     deleteTransactionUseCase = MockDeleteTransactionUseCase();
-    getCategoriesUseCase = MockGetCategoriesUseCase();
-    when(() => getCategoriesUseCase()).thenAnswer((_) async => []);
+    watchCategoriesUseCase = MockWatchCategoriesUseCase();
+    when(() => watchCategoriesUseCase()).thenAnswer((_) => Stream.empty());
     transactionsBloc = TransactionsBloc(
       getTransactionsUseCase: getTransactionsUseCase,
       addTransactionUseCase: addTransactionUseCase,
       deleteTransactionUseCase: deleteTransactionUseCase,
-      getCategoriesUseCase: getCategoriesUseCase,
+      watchCategoriesUseCase: watchCategoriesUseCase,
     );
     registerFallbackValue(TransactionType.expense);
   });
