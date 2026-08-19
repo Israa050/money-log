@@ -3,7 +3,7 @@
 Notes for each build pushed to `production`. The top entry is what
 Firebase App Distribution shows testers for the current release.
 
-## Unreleased
+## v0.3.0 — Category totals & tags
 
 - Added categories: a `Categories` Drift table with a nullable FK on
   `transactions.categoryId`, four default categories (Food, Transport,
