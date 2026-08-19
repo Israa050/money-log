@@ -3,6 +3,33 @@
 Notes for each build pushed to `production`. The top entry is what
 Firebase App Distribution shows testers for the current release.
 
+## v0.4.0 — Manage categories
+
+- Categories are now a fully editable resource: a new "Manage Categories"
+  screen (opened from the transactions app bar) supports creating,
+  renaming/recoloring, and deleting categories, closing the gap called out
+  in v0.3.0.
+- Changed `transactions.categoryId`'s foreign key to `ON DELETE SET NULL`
+  (schema v2 → v3 migration) so deleting a category with transactions
+  attached orphans them into the existing "Uncategorized" bucket instead of
+  failing with a constraint error.
+- `CategoryRepository` gained a reactive `watchCategories()` (replacing the
+  old one-shot fetch) plus `addCategory`/`updateCategory`/`deleteCategory`,
+  so a category change on the new screen now appears immediately in the
+  add-transaction chips and transaction-tile pills — no restart required.
+- Category names are validated on add/update: trimmed, rejected if empty,
+  and rejected as a case-insensitive duplicate of an existing name.
+- Color selection uses a fixed 12-swatch palette (a superset of the four
+  seeded colors) instead of a free-form picker, so every color stays
+  legible in both light and dark theme.
+- Added a new `CategoriesBloc`, kept separate from `TransactionsBloc` (which
+  only reads categories), following the same single-responsibility split
+  already used for `BalanceCubit`/`CategoryTotalsCubit`.
+- Added test coverage for all of the above: category CRUD and the
+  `ON DELETE SET NULL` orphaning behavior against a real in-memory Drift
+  database, repository-level name validation, and `CategoriesBloc`
+  success/failure emissions via mocktail.
+
 ## v0.3.0 — Category totals & tags
 
 - Added categories: a `Categories` Drift table with a nullable FK on

@@ -17,12 +17,6 @@ class TransactionTile extends StatelessWidget {
   final VoidCallback onDelete;
   final CategoryEntity? category;
 
-  Color? _parseHex(String? hex) {
-    if (hex == null) return null;
-    final value = int.tryParse(hex.replaceFirst('#', 'FF'), radix: 16);
-    return value == null ? null : Color(value);
-  }
-
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
@@ -30,7 +24,7 @@ class TransactionTile extends StatelessWidget {
     final color = isIncome ? colors.income : colors.expense;
     final wash = isIncome ? colors.incomeWash : colors.expenseWash;
     final sign = isIncome ? '+' : '-';
-    final categoryColor = _parseHex(category?.colorHex);
+    final categoryColor = parseHexColor(category?.colorHex);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),

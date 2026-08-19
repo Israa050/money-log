@@ -4,6 +4,7 @@ import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
 import 'package:stockflow/transactions/domain/entities/category_entity.dart';
 import 'package:stockflow/transactions/domain/entities/transaction_entity.dart';
 import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
+import 'package:stockflow/transactions/presentation/screens/categories_screen.dart';
 import 'package:stockflow/transactions/presentation/widgets/add_transaction_sheet.dart';
 import 'package:stockflow/transactions/presentation/widgets/balance_summary_card.dart';
 import 'package:stockflow/transactions/presentation/widgets/category_totals_card.dart';
@@ -72,7 +73,18 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Transactions')),
+      appBar: AppBar(
+        title: const Text('Transactions'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.label_outline),
+            tooltip: 'Manage categories',
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const CategoriesScreen())),
+          ),
+        ],
+      ),
       body: BlocBuilder<TransactionsBloc, TransactionsState>(
         builder: (context, state) {
           final allData = switch (state) {

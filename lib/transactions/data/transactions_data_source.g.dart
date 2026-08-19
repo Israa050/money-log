@@ -348,7 +348,7 @@ class $TransactionsTable extends Transactions
     type: DriftSqlType.string,
     requiredDuringInsert: false,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES categories (id)',
+      'REFERENCES categories (id) ON DELETE SET NULL',
     ),
   );
   @override
@@ -773,6 +773,16 @@ abstract class _$TransactionsDataSource extends GeneratedDatabase {
     categories,
     transactions,
   ];
+  @override
+  StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'categories',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('transactions', kind: UpdateKind.update)],
+    ),
+  ]);
 }
 
 typedef $$CategoriesTableCreateCompanionBuilder =

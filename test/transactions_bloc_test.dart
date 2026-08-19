@@ -9,8 +9,8 @@ import 'package:stockflow/transactions/domain/repositories/category_repository.d
 import 'package:stockflow/transactions/domain/repositories/transactions_repository.dart';
 import 'package:stockflow/transactions/domain/usecases/add_transaction_usecase.dart';
 import 'package:stockflow/transactions/domain/usecases/delete_transaction_usecase.dart';
-import 'package:stockflow/transactions/domain/usecases/get_categories_usecase.dart';
 import 'package:stockflow/transactions/domain/usecases/get_transactions_usecase.dart';
+import 'package:stockflow/transactions/domain/usecases/watch_categories_usecase.dart';
 
 // Not using bloc_test/mocktail here (neither is a dev_dependency yet) --
 // these drive a real in-memory TransactionsDataSource instead, same approach
@@ -32,7 +32,7 @@ void main() {
   late GetTransactionsUseCase getTransactionsUseCase;
   late AddTransactionUseCase addTransactionUseCase;
   late DeleteTransactionUseCase deleteTransactionUseCase;
-  late GetCategoriesUseCase getCategoriesUseCase;
+  late WatchCategoriesUseCase watchCategoriesUseCase;
   late TransactionsBloc bloc;
 
   setUp(() {
@@ -42,12 +42,12 @@ void main() {
     getTransactionsUseCase = GetTransactionsUseCase(repository);
     addTransactionUseCase = AddTransactionUseCase(repository);
     deleteTransactionUseCase = DeleteTransactionUseCase(repository);
-    getCategoriesUseCase = GetCategoriesUseCase(categoryRepository);
+    watchCategoriesUseCase = WatchCategoriesUseCase(categoryRepository);
     bloc = TransactionsBloc(
       getTransactionsUseCase: getTransactionsUseCase,
       addTransactionUseCase: addTransactionUseCase,
       deleteTransactionUseCase: deleteTransactionUseCase,
-      getCategoriesUseCase: getCategoriesUseCase,
+      watchCategoriesUseCase: watchCategoriesUseCase,
     );
   });
 
@@ -61,7 +61,11 @@ void main() {
       expect(bloc.state, isA<TransactionsInitial>());
     });
 
-    test('empty table -> emits Loaded([]).', () async {
+    test('empty table -> settles on Loaded([]).', () async {
+      // The transactions and categories subscriptions are independent
+      // streams that both feed into Loaded, so which one ticks first
+      // (and therefore how many Loaded emissions arrive) isn't
+      // guaranteed -- only the final settled state is.
       final states = <TransactionsState>[];
       final sub = bloc.stream.listen(states.add);
 
@@ -69,8 +73,10 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 50));
       await sub.cancel();
 
-      expect(states, [isA<Loaded>()]);
-      expect((states.single as Loaded).data, isEmpty);
+      expect(states, isNotEmpty);
+      expect(states, everyElement(isA<Loaded>()));
+      final loaded = states.last as Loaded;
+      expect(loaded.data, isEmpty);
     });
 
     test('existing rows -> Loaded contains them.', () async {

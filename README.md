@@ -62,6 +62,7 @@ delete with a countdown undo.
 - 📋 **Transaction list** — card-styled rows with type icon, note, date, amount, and a color-coded category tag when one is set
 - ➕ **Add transactions** — bottom sheet with an income/expense toggle, amount, optional note, and optional category
 - 🏷️ **Categories** — pick from four seeded default categories (Food, Transport, Shopping, Bills) when adding a transaction, shown as color-coded chips; the same colors carry through to the transaction list and the category totals card
+- 🗂️ **Manage categories** — a dedicated screen (opened from the transactions app bar) to create, rename/recolor, and delete categories from a fixed swatch palette; deleting a category that still has transactions orphans them into "Uncategorized" instead of failing, and every change propagates live to the add-transaction chips and transaction pills
 - 👉 **Swipe to delete** — swipe a row away, then **Undo** within a 5-second countdown before it's permanently deleted
 - 🔄 **Fully reactive** — every screen is driven by a live Drift stream; add/delete never trigger a manual reload
 - 💾 **Local persistence** — everything is stored in an on-device SQLite database via Drift
@@ -102,15 +103,16 @@ flutter test
 Two complementary approaches are used:
 
 - **Drift-backed tests** (`database_test.dart`, `transactions_repository_test.dart`,
-  `transactions_bloc_test.dart`, `widget_test.dart`) drive a real in-memory
-  Drift database (`NativeDatabase.memory()`) instead of mocks, so no state
-  leaks between tests and nothing touches disk.
+  `category_repository_test.dart`, `transactions_bloc_test.dart`, `widget_test.dart`)
+  drive a real in-memory Drift database (`NativeDatabase.memory()`) instead of
+  mocks, so no state leaks between tests and nothing touches disk.
 - **Mocktail-backed bloc/cubit tests** (`transactions_bloc_mocktail_test.dart`,
-  `balance_cubit_mocktail_test.dart`) use [`bloc_test`](https://pub.dev/packages/bloc_test)
-  and [`mocktail`](https://pub.dev/packages/mocktail) with a
-  `MockTransactionsRepository` ([`test/helpers/mocks.dart`](test/helpers/mocks.dart))
-  to assert state emissions in isolation, including failure paths a real
-  repository can't be forced into (see below).
+  `categories_bloc_mocktail_test.dart`, `balance_cubit_mocktail_test.dart`)
+  use [`bloc_test`](https://pub.dev/packages/bloc_test) and
+  [`mocktail`](https://pub.dev/packages/mocktail) with mocked use cases
+  ([`test/helpers/mocks.dart`](test/helpers/mocks.dart)) to assert state
+  emissions in isolation, including failure paths a real repository can't be
+  forced into (see below).
 
 ### Continuous integration
 
@@ -144,7 +146,7 @@ lib/
 │       ├── app_colors.dart        # Semantic color tokens (light/dark) as a ThemeExtension
 │       └── app_theme.dart         # Builds ThemeData (app bar, cards, inputs, FAB...) from the tokens
 └── transactions/
-    ├── bloc/                      # TransactionsBloc, events, states, BalanceCubit, CategoryTotalsCubit — depend on use cases only
+    ├── bloc/                      # TransactionsBloc, CategoriesBloc, events, states, BalanceCubit, CategoryTotalsCubit — depend on use cases only
     ├── domain/
     │   ├── entities/
     │   │   ├── transaction_entity.dart     # Plain domain model — no Drift types; carries categoryId
@@ -153,32 +155,40 @@ lib/
     │   │   └── category_total_entity.dart  # One category's total expense — nullable id/name for the "Uncategorized" bucket
     │   ├── repositories/
     │   │   ├── transactions_repository.dart  # Abstract interface — zero data-layer imports
-    │   │   └── category_repository.dart      # Abstract interface — one-shot getCategories(), reactive watchCategoryTotals()
+    │   │   └── category_repository.dart      # Abstract interface — reactive watchCategories()/watchCategoryTotals(), Result-returning CRUD writes
     │   └── usecases/
     │       ├── get_transactions_usecase.dart
     │       ├── watch_balance_usecase.dart
     │       ├── add_transaction_usecase.dart
     │       ├── delete_transaction_usecase.dart
-    │       ├── get_categories_usecase.dart
+    │       ├── watch_categories_usecase.dart
+    │       ├── add_category_usecase.dart
+    │       ├── update_category_usecase.dart
+    │       ├── delete_category_usecase.dart
     │       └── watch_category_totals_usecase.dart
     ├── data/
     │   ├── models/
-    │   │   ├── transactions.dart  # Drift table definition (imports TransactionType from domain); categoryId FK -> Categories
+    │   │   ├── transactions.dart  # Drift table definition (imports TransactionType from domain); categoryId FK -> Categories, ON DELETE SET NULL
     │   │   └── categories.dart    # Drift table definition — id, name, nullable colorHex
     │   ├── repos/
     │   │   ├── transactions_repository_impl.dart  # Implements TransactionsRepository; maps Drift rows <-> entities
-    │   │   └── category_repository_impl.dart      # Implements CategoryRepository; maps Drift rows <-> entities, incl. CategoryTotalRow -> CategoryTotalEntity
+    │   │   └── category_repository_impl.dart      # Implements CategoryRepository; maps Drift rows <-> entities, incl. CategoryTotalRow -> CategoryTotalEntity; validates name trim/empty/case-insensitive-duplicate before writing
     │   ├── connection.dart                   # Platform-specific Drift connection
-    │   ├── transactions_data_source.dart     # Drift database class (real persistence); seeds 4 default categories on create; categoryTotals join query
+    │   ├── transactions_data_source.dart     # Drift database class (real persistence, schema v3); seeds 4 default categories on create; category CRUD + categoryTotals join query
     │   └── transactions_data_source.g.dart   # Generated by drift_dev — do not edit
     └── presentation/
-        ├── format.dart                         # Amount/date formatting helpers
+        ├── format.dart                         # Amount/date formatting + parseHexColor helper (shared by every widget below)
+        ├── category_palette.dart               # Fixed 12-swatch hex palette used by the category editor
         ├── screens/
-        │   └── transactions_screen.dart        # Main screen: composes the widgets below
+        │   ├── transactions_screen.dart        # Main screen: composes the widgets below; app bar action opens CategoriesScreen
+        │   └── categories_screen.dart          # Manage-categories screen: list + add/edit/delete
         └── widgets/
             ├── add_transaction_sheet.dart       # Bottom sheet for creating a transaction
             ├── balance_summary_card.dart        # Balance figure + income/expense stat pills
             ├── category_totals_card.dart        # Collapsible spending-by-category card, reactive via CategoryTotalsCubit
+            ├── category_list_tile.dart          # One row on CategoriesScreen: color dot, name, edit/delete icon buttons
+            ├── category_editor_sheet.dart       # Bottom sheet for creating or editing a category (name + palette picker)
+            ├── delete_category_dialog.dart      # Confirmation dialog warning that orphaned transactions become "Uncategorized"
             ├── stat_pill.dart                   # Single income/expense mini stat
             ├── transaction_tile.dart            # Swipe-to-delete row; shows a category pill when categoryId resolves
             ├── transactions_list.dart           # List/empty-state switch; resolves each row's category by id before rendering
@@ -339,7 +349,7 @@ erDiagram
         TEXT note "nullable"
         DATETIME occurredTime "defaults to now; can be backdated"
         DATETIME creationTime "defaults to now; row insert time"
-        TEXT categoryId FK "nullable, references CATEGORIES.id"
+        TEXT categoryId FK "nullable, references CATEGORIES.id, ON DELETE SET NULL"
     }
     CATEGORIES {
         TEXT id PK "fixed string for seeded rows, e.g. 'default-food'"
@@ -372,13 +382,63 @@ erDiagram
   Both timestamps default to "now" via `withDefault(currentDateAndTime)`, but
   `occurredTime` can be overridden on insert to log a backdated transaction,
   while `creationTime` is meant to always reflect actual insert time.
-- **`CategoryRepository.getCategories()` returns a plain `Future<List<CategoryEntity>>`,
-  not a `Stream`.** Categories are a rarely-changing lookup table with no
-  CRUD UI yet, so a reactive `.watch()` stream would add subscription
-  lifecycle management for no present benefit. Trade-off: if a future
-  "manage categories" screen adds/edits rows, any already-open picker won't
-  see the change until the bloc reloads — acceptable today, revisit if that
-  screen gets built.
+- **`categoryId`'s foreign key is `ON DELETE SET NULL`, not the SQLite default
+  (`NO ACTION`) or `CASCADE`.** With categories now deletable, `NO ACTION`
+  would make deleting any category with transactions attached throw a
+  constraint violation (SQLite enforces this immediately —
+  `beforeOpen` turns `PRAGMA foreign_keys = ON`). `CASCADE` was rejected too:
+  deleting a category is removing an organizational label, not disputing
+  that money was spent, so silently destroying the transactions themselves
+  would be the wrong failure mode for a finance app. `SET NULL` orphans the
+  transaction into the existing "Uncategorized" bucket instead — a state
+  `watchCategoryTotals()`/`CategoryTotalsCard` already render correctly, so
+  no new UI branch was needed for it. This changed the schema
+  (`schemaVersion` 2 → 3) via a `TableMigration`, since SQLite can't `ALTER`
+  a column's foreign-key action in place — drift's `alterTable` rebuilds the
+  table (create-copy-drop-rename) with the new constraint.
+- **`CategoryRepository.watchCategories()` returns a `Stream<List<CategoryEntity>>`,
+  not a one-shot `Future`** (this replaced the original `Future`-returning
+  `getCategories()` once a manage-categories screen existed). A `Future`
+  fetched once in `TransactionsBloc._onLaunch` meant a category created,
+  renamed, or deleted on the new screen would not appear anywhere else —
+  the add-transaction chips, the transaction-tile pills — until the app
+  restarted, which contradicts this app's whole "no manual refresh"
+  premise. `TransactionsBloc` now holds a second `StreamSubscription`
+  (alongside the transactions one) feeding a private `_CategoriesUpdated`
+  event, so both streams merge into the same `Loaded.categories` field.
+  Trade-off: because the two subscriptions start independently and Drift
+  gives no guarantee about which one's first tick lands first, a fresh
+  `AppLaunchEvent` can legitimately emit `Loaded` more than once before
+  settling — callers should assert on the final state, not the emission
+  count (see `transactions_bloc_test.dart`'s "settles on Loaded([])" test).
+- **Category name uniqueness is enforced in `CategoryRepositoryImpl`, not as a
+  SQL `UNIQUE` constraint.** Adding a unique index would need its own schema
+  migration; validating in the repository (trim, reject empty, reject a
+  case-insensitive duplicate via `findCategoryByName`) gives the same
+  guarantee without one, and returns a `Result.failure` with a message the
+  UI can show directly instead of parsing a raw SQLite constraint error.
+  Case-insensitivity matters because SQLite's default text collation is
+  case-sensitive (`BINARY`), so `name.equals(...)` alone would let
+  `"groceries"` and `"Groceries"` coexist — `findCategoryByName` compares
+  `.lower()` on both sides specifically to close that gap.
+- **The four seeded default categories are not protected from edit or
+  delete.** They're ordinary rows distinguished only by their fixed
+  `'default-*'` ids, not a special "system category" flag — a user can
+  rename, recolor, or remove any of them. Protecting them would mean a
+  disabled delete button the user can't act on and a `startsWith('default-')`
+  check leaking into the UI layer, for a restriction nothing in the product
+  actually calls for; an empty category list is already a handled state
+  (the add sheet hides its chips section, `CategoriesScreen` shows an empty
+  state).
+- **The category color picker is a fixed swatch palette
+  (`kCategoryPalette`, 12 hex strings), not a free-form color picker
+  package.** A full HSV/RGB picker (e.g. `flutter_colorpicker`) would add a
+  dependency to an intentionally lean `pubspec.yaml` (no UI packages beyond
+  Flutter/Cupertino today) and lets a user pick a color that's illegible
+  against the app's `surface` color in one of the two themes. A curated
+  palette — a superset of the four seeded colors — is guaranteed to render
+  visibly in both light and dark mode, at the cost of not offering unlimited
+  color choice.
 - **`AddTransactionEvent`/`addTransaction(...)` take a plain `String? categoryId`,
   not a `CategoryEntity?`.** Keeping the write path on primitive ids (the same
   pattern `deleteTransaction(String id)` already uses) avoids the
@@ -386,13 +446,23 @@ erDiagram
   read `.id` off it — a repository whose job is "persist a transaction"
   doesn't need to know what a category *is*, only its foreign key.
 - **`categoryId` is threaded through `TransactionsBloc`, not fetched directly
-  by `AddTransactionSheet` via `get_it`.** `GetCategoriesUseCase` is a
-  constructor dependency of `TransactionsBloc` (alongside the other four use
-  cases), fetched once in `_onLaunch` and carried in `Loaded.categories`.
-  The alternative — the sheet calling `getIt<GetCategoriesUseCase>()()`
-  directly in a `FutureBuilder` — would bypass the bloc layer and introduce a
+  by `AddTransactionSheet` via `get_it`.** `WatchCategoriesUseCase` is a
+  constructor dependency of `TransactionsBloc` (alongside the other three use
+  cases), subscribed to in `_onLaunch` and carried in `Loaded.categories`.
+  The alternative — the sheet calling `getIt<WatchCategoriesUseCase>()()`
+  directly in a `StreamBuilder` — would bypass the bloc layer and introduce a
   second, inconsistent way widgets access use cases in this codebase; every
   other read/write already goes through the bloc, so categories do too.
+- **Category CRUD lives in a new `CategoriesBloc`, not folded into
+  `TransactionsBloc`.** `TransactionsBloc` only ever *reads* categories (for
+  the chips/pills); it has no reason to also own `AddCategoryEvent`/
+  `UpdateCategoryEvent`/`DeleteCategoryEvent` and their error states —
+  doing so would bloat one bloc with two unrelated responsibilities and
+  couple `CategoriesScreen`'s lifecycle to `TransactionsScreen`'s
+  `BlocProvider`. This mirrors how `BalanceCubit` and `CategoryTotalsCubit`
+  are already separate from `TransactionsBloc` despite reading the same
+  tables — single-responsibility blocs, not one mega-bloc, is the
+  established pattern here.
 - **4 default categories (Food, Transport, Shopping, Bills) are seeded via
   `onCreate` in `TransactionsDataSource`'s `MigrationStrategy`, with fixed
   string ids (`'default-food'`, etc.) instead of generated UUIDs.** `onCreate`
@@ -440,19 +510,40 @@ erDiagram
   - `TransactionsRepositoryImpl` (in `data/repos/`) implements the
     interface and is the only place that maps Drift `Transaction` rows
     to/from `TransactionEntity`.
-- `TransactionsBloc`, fully reactive and wired end-to-end to the five use
-  cases via `get_it` (never to the repository directly). A single
-  long-lived stream subscription (started on `AppLaunchEvent`, cancelled in
-  `close()`) drives every `Loaded` state; writes only emit on failure
-  (`TransactionsError`).
-- Categories: a `Categories` Drift table (`id`, `name`, nullable `colorHex`)
-  with a nullable FK on `transactions.categoryId`, four default rows seeded
-  on database creation, a `CategoryRepository`/`CategoryRepositoryImpl` +
-  `GetCategoriesUseCase` following the same domain/data split as
-  transactions, and a color-coded `ChoiceChip` picker in
-  `AddTransactionSheet` sourced from `TransactionsBloc`'s state (see
-  [Design decisions](#design-decisions) above for the `Future`-vs-`Stream`
-  and id-vs-entity trade-offs made along the way).
+- `TransactionsBloc`, fully reactive and wired end-to-end to its use cases
+  via `get_it` (never to the repository directly). Two long-lived stream
+  subscriptions — transactions and, as of this release, categories — are
+  started on `AppLaunchEvent` and cancelled together in `close()`; writes
+  only emit on failure (`TransactionsError`).
+- **Category management (new):** categories are now a fully editable
+  resource, not a fixed set of four seeded rows.
+  - `Categories` Drift table (`id`, `name`, nullable `colorHex`), schema
+    v3, with `transactions.categoryId`'s FK changed to `ON DELETE SET
+    NULL` via a `TableMigration` — deleting a category with transactions
+    attached orphans them instead of throwing a constraint error.
+  - `CategoryRepository`/`CategoryRepositoryImpl` grew a reactive
+    `watchCategories()` (replacing the old one-shot `getCategories()`) plus
+    `Result`-returning `addCategory`/`updateCategory`/`deleteCategory`,
+    with trim/empty/case-insensitive-duplicate name validation done in the
+    repository rather than a SQL constraint.
+  - Four new use cases (`WatchCategoriesUseCase`, `AddCategoryUseCase`,
+    `UpdateCategoryUseCase`, `DeleteCategoryUseCase`) and a new
+    `CategoriesBloc` (mirroring `TransactionsBloc`'s shape: a `CategoriesLoaded`/
+    `CategoriesError` state pair with `previousData` preserved across
+    failures) that owns category mutation, kept separate from
+    `TransactionsBloc`, which only reads categories.
+  - A new `CategoriesScreen` (reached via an app-bar icon on the
+    transactions screen), `CategoryEditorSheet` (add/edit, name field +
+    a fixed 12-swatch color palette) and `DeleteCategoryDialog`
+    (warns that orphaned transactions become "Uncategorized").
+    `AddTransactionSheet`'s `ChoiceChip` picker is now sourced from
+    `TransactionsBloc`'s live category stream, so a category created,
+    renamed, or deleted on the new screen is reflected everywhere
+    instantly — no restart required (see
+    [Design decisions](#design-decisions) above for the full set of
+    trade-offs: `ON DELETE SET NULL` vs. blocking/cascading,
+    `Future`-vs-`Stream`, in-repository validation vs. a SQL constraint,
+    and the fixed palette vs. a color-picker package).
 - Reactive total spending per category: `TransactionsDataSource.categoryTotals`
   joins `transactions` to `categories` via a `leftOuterJoin`, filters to
   expense transactions, and groups by `categoryId`, so uncategorized spend
@@ -483,17 +574,33 @@ erDiagram
   (`NativeDatabase.memory()`) rather than mocks:
   - `test/database_test.dart` — inserts, defaults, backdating, enum
     round-tripping, duplicate-id rejection, deletes, empty/multi-row reads,
-    and that the `allTransactions` stream re-emits after a change.
+    and that the `allTransactions` stream re-emits after a change; a
+    `Categories` group covers the same shape for category CRUD plus the
+    key regression test for this release — deleting a category referenced
+    by a transaction sets `categoryId` to `null` instead of throwing
+    (verifying `ON DELETE SET NULL` against a real SQLite constraint, not
+    just application code).
   - `test/transactions_repository_test.dart` — `TransactionsRepositoryImpl`
     against a real Drift database: `addTransaction` note/type/amount
     handling and distinct-id generation, `getAllTransactions` stream
     behavior (including reactivity), and `addTransaction`/`deleteTransaction`
     `Success`/`Failure` results.
+  - `test/category_repository_test.dart` (new) — `CategoryRepositoryImpl`
+    against a real Drift database: name trim/empty/case-insensitive-duplicate
+    validation on add and update, that renaming a category to its own
+    current name is not treated as a duplicate, `watchCategories()`
+    reactivity, and that deleting a category with transactions attached
+    orphans their spend into the `"Uncategorized"` bucket of
+    `watchCategoryTotals()`.
   - `test/transactions_bloc_test.dart` — `TransactionsBloc` built from real
     use cases over a real Drift database: `AppLaunchEvent`,
     `AddTransactionEvent`, `DeleteTransactionEvent` state emissions under the
     stream-driven model, the double-subscription guard, and that writes emit
-    nothing on success (only the subscription does).
+    nothing on success (only the subscription does). Because
+    `AppLaunchEvent` now starts two independent stream subscriptions
+    (transactions and categories) with no guaranteed ordering, its "empty
+    table" test asserts on the settled state rather than a single expected
+    emission.
   - `test/widget_test.dart` — boots the full widget tree against an
     in-memory database with proper teardown.
 - Mocktail-backed bloc/cubit unit tests, mocking the use cases each bloc
@@ -502,7 +609,7 @@ erDiagram
   boundary:
   - `test/transactions_bloc_mocktail_test.dart` — `TransactionsBloc` against
     mocked `GetTransactionsUseCase`/`AddTransactionUseCase`/
-    `DeleteTransactionUseCase`:
+    `DeleteTransactionUseCase`/`WatchCategoriesUseCase`:
     - `AppLaunchEvent`: stream success → `Loaded`; stream error →
       `TransactionsError` (covers the `onError` handling added to the
       launch subscription).
@@ -513,6 +620,12 @@ erDiagram
       preserved) — failure branches a real repository can't be forced into,
       since ids are generated internally and duplicate-id collisions aren't
       reachable through the public event API.
+  - `test/categories_bloc_mocktail_test.dart` (new) — `CategoriesBloc`
+    against mocked `WatchCategoriesUseCase`/`AddCategoryUseCase`/
+    `UpdateCategoryUseCase`/`DeleteCategoryUseCase`, covering the same
+    success/failure/`previousData`-preservation shape as
+    `transactions_bloc_mocktail_test.dart` for `AddCategoryEvent`,
+    `UpdateCategoryEvent`, and `DeleteCategoryEvent`.
   - `test/balance_cubit_mocktail_test.dart` — `BalanceCubit` against a mocked
     `WatchBalanceUseCase`: initial state is `0` before the stream emits, a
     single stream value is re-emitted as-is, and multiple stream values are
@@ -522,9 +635,34 @@ erDiagram
 
 - No editing of existing transactions — only add and delete.
 - No filtering/search/date-range views over the transaction list.
-- No UI to create/edit/delete categories — limited to the 4 seeded defaults.
+- No protection against deleting all categories at once, beyond the add
+  sheet and category list both handling an empty category set gracefully.
 
 ## 🏷️ Release notes
+
+### v0.4.0 — Manage categories
+
+- Added full category CRUD behind a new "Manage Categories" screen (opened
+  from the transactions app bar): create, rename/recolor via a fixed
+  swatch palette, and delete.
+- Changed `transactions.categoryId`'s foreign key to `ON DELETE SET NULL`
+  (schema v2 → v3, via a drift `TableMigration`) so deleting a category
+  with transactions attached orphans them into "Uncategorized" instead of
+  throwing a constraint error.
+- `CategoryRepository.watchCategories()` replaced the old one-shot
+  `getCategories()`, and `TransactionsBloc` now holds a second stream
+  subscription for it — a category created, renamed, or deleted propagates
+  to the add-transaction chips and transaction pills immediately.
+- Added `addCategory`/`updateCategory`/`deleteCategory` (all `Result`-returning)
+  with name validation — trimmed, non-empty, case-insensitive-duplicate
+  rejected — enforced in the repository rather than a SQL constraint.
+- Added a new `CategoriesBloc` for category mutation, kept separate from
+  `TransactionsBloc` (which only reads categories), matching the existing
+  `BalanceCubit`/`CategoryTotalsCubit` single-responsibility split.
+- Added Drift-backed tests for category CRUD and the orphaning behavior,
+  a `CategoryRepositoryImpl` test suite mirroring
+  `transactions_repository_test.dart`, and mocktail-based
+  `CategoriesBloc` tests mirroring `transactions_bloc_mocktail_test.dart`.
 
 ### v0.3.0 — Category totals & tags
 

@@ -13,9 +13,9 @@ import 'package:stockflow/transactions/domain/repositories/category_repository.d
 import 'package:stockflow/transactions/domain/repositories/transactions_repository.dart';
 import 'package:stockflow/transactions/domain/usecases/add_transaction_usecase.dart';
 import 'package:stockflow/transactions/domain/usecases/delete_transaction_usecase.dart';
-import 'package:stockflow/transactions/domain/usecases/get_categories_usecase.dart';
 import 'package:stockflow/transactions/domain/usecases/get_transactions_usecase.dart';
 import 'package:stockflow/transactions/domain/usecases/watch_balance_usecase.dart';
+import 'package:stockflow/transactions/domain/usecases/watch_categories_usecase.dart';
 import 'package:stockflow/transactions/domain/usecases/watch_category_totals_usecase.dart';
 import 'package:stockflow/transactions/presentation/screens/transactions_screen.dart';
 
@@ -36,8 +36,8 @@ void main() {
     getIt.registerSingleton<GetTransactionsUseCase>(
       GetTransactionsUseCase(getIt<TransactionsRepository>()),
     );
-    getIt.registerSingleton<GetCategoriesUseCase>(
-      GetCategoriesUseCase(getIt<CategoryRepository>()),
+    getIt.registerSingleton<WatchCategoriesUseCase>(
+      WatchCategoriesUseCase(getIt<CategoryRepository>()),
     );
     getIt.registerSingleton<WatchBalanceUseCase>(
       WatchBalanceUseCase(getIt<TransactionsRepository>()),
@@ -58,7 +58,7 @@ void main() {
         getTransactionsUseCase: getIt<GetTransactionsUseCase>(),
         addTransactionUseCase: getIt<AddTransactionUseCase>(),
         deleteTransactionUseCase: getIt<DeleteTransactionUseCase>(),
-        getCategoriesUseCase: getIt<GetCategoriesUseCase>(),
+        watchCategoriesUseCase: getIt<WatchCategoriesUseCase>(),
       ),
     );
     getIt.registerFactory<BalanceCubit>(

@@ -1,3 +1,11 @@
+import 'package:flutter/material.dart';
+
+Color? parseHexColor(String? hex) {
+  if (hex == null) return null;
+  final value = int.tryParse(hex.replaceFirst('#', 'FF'), radix: 16);
+  return value == null ? null : Color(value);
+}
+
 String formatAmountMinor(int amountMinor) {
   final sign = amountMinor < 0 ? '-' : '';
   final abs = amountMinor.abs();
