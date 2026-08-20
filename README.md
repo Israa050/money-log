@@ -77,6 +77,7 @@ delete with a countdown undo.
 | State mgmt     | [flutter_bloc](https://pub.dev/packages/flutter_bloc)         |
 | Persistence    | [drift](https://pub.dev/packages/drift) (SQLite)               |
 | DI             | [get_it](https://pub.dev/packages/get_it)                     |
+| Connectivity   | [connectivity_plus](https://pub.dev/packages/connectivity_plus) |
 | IDs            | [uuid](https://pub.dev/packages/uuid) (client-generated v4)   |
 | Logging        | [logger](https://pub.dev/packages/logger)                     |
 | Testing        | [bloc_test](https://pub.dev/packages/bloc_test) + [mocktail](https://pub.dev/packages/mocktail) |
@@ -142,6 +143,16 @@ lib/
 │   ├── app_bloc_observer.dart     # Logs every Bloc event/state change/error
 │   ├── result.dart                # Result<T> (Success/Failure) — shared success/error wrapper
 │   ├── service_locator.dart       # get_it setup — binds TransactionsRepository, use cases, Bloc/Cubit
+│   ├── connectivity/              # Cross-cutting network-status layer (not a feature — see below)
+│   │   ├── domain/
+│   │   │   ├── network_status.dart          # online/offline enum, owned by domain
+│   │   │   ├── connectivity_repository.dart # Abstract interface — zero data-layer/plugin imports
+│   │   │   └── usecases/
+│   │   │       └── watch_connectivity_usecase.dart
+│   │   ├── data/
+│   │   │   └── connectivity_repository_impl.dart # Wraps connectivity_plus; maps ConnectivityResult -> NetworkStatus
+│   │   └── cubit/
+│   │       └── connectivity_cubit.dart      # Broadcasts NetworkStatus app-wide; registered as a singleton
 │   └── theme/
 │       ├── app_colors.dart        # Semantic color tokens (light/dark) as a ThemeExtension
 │       └── app_theme.dart         # Builds ThemeData (app bar, cards, inputs, FAB...) from the tokens
@@ -563,6 +574,24 @@ erDiagram
   lookup map once per build so each row resolves its category in O(1) rather
   than scanning the category list per row. No pill renders for an
   uncategorized transaction.
+- **Connectivity layer (new):** a core, cross-cutting network-status layer
+  under `lib/core/connectivity/` — not part of the `transactions` feature,
+  since online/offline state is infrastructure any future feature may need,
+  not business logic.
+  - `ConnectivityRepository`/`ConnectivityRepositoryImpl` wrap
+    `connectivity_plus`, mapping its `List<ConnectivityResult>` down to a
+    domain-owned `NetworkStatus` enum (`online`/`offline`) so no plugin type
+    crosses into `domain/` — `checkConnectivity()` returns
+    `Result<NetworkStatus>`, with `Failure` reserved for real plugin errors
+    (not "you're offline", which is a normal `Success(NetworkStatus.offline)`).
+  - `WatchConnectivityUseCase` is a thin `call()` wrapper around the
+    repository's status stream, matching every other use case's shape.
+  - `ConnectivityCubit` subscribes to that stream once and broadcasts
+    `NetworkStatus` — registered as a `getIt.registerLazySingleton`, not
+    `registerFactory` like the feature blocs/cubits, since it's meant to be
+    one shared app-wide instance rather than a fresh one per screen.
+  - Not yet consumed anywhere in the UI (no `BlocProvider`, no offline
+    banner) — see [Not yet done](#-not-yet-done).
 - `AppBlocObserver` — logs every Bloc event, state change, and error via the
   `logger` package.
 - Full presentation layer: transactions screen with balance summary,
@@ -637,8 +666,26 @@ erDiagram
 - No filtering/search/date-range views over the transaction list.
 - No protection against deleting all categories at once, beyond the add
   sheet and category list both handling an empty category set gracefully.
+- `ConnectivityCubit` exists and is registered in `get_it`, but nothing in
+  the widget tree provides or listens to it yet — no offline banner, no
+  action gated on network state.
 
 ## 🏷️ Release notes
+
+### Unreleased — Connectivity layer
+
+- Added `connectivity_plus` and a core, cross-cutting connectivity layer
+  under `lib/core/connectivity/` (`ConnectivityRepository`/Impl,
+  `WatchConnectivityUseCase`, `ConnectivityCubit`), all registered as
+  `get_it` lazy singletons. Placed in `core/`, not as its own feature or
+  inside `transactions/`, since network status is infrastructure any
+  feature may depend on, not a business concern.
+- The domain layer exposes a `NetworkStatus` enum instead of the plugin's
+  `ConnectivityResult`, and treats "offline" as a normal
+  `Success(NetworkStatus.offline)` rather than a `Result.failure` — `Failure`
+  is reserved for actual connectivity-check errors.
+- Not yet wired into the UI — no `BlocProvider` for `ConnectivityCubit`, no
+  offline banner or gated actions yet.
 
 ### v0.4.0 — Manage categories
 
