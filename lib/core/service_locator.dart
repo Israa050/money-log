@@ -1,4 +1,8 @@
 import 'package:get_it/get_it.dart';
+import 'package:stockflow/core/connectivity/cubit/connectivity_cubit.dart';
+import 'package:stockflow/core/connectivity/data/connectivity_repository_impl.dart';
+import 'package:stockflow/core/connectivity/domain/connectivity_repository.dart';
+import 'package:stockflow/core/connectivity/domain/usecases/watch_connectivity_usecase.dart';
 import 'package:stockflow/transactions/bloc/balance_cubit.dart';
 import 'package:stockflow/transactions/bloc/categories_bloc.dart';
 import 'package:stockflow/transactions/bloc/category_totals_cubit.dart';
@@ -22,6 +26,20 @@ import 'package:stockflow/transactions/domain/usecases/watch_category_totals_use
 final getIt = GetIt.instance;
 
 void setupServiceLocator() {
+  getIt.registerLazySingleton<ConnectivityRepository>(
+    () => ConnectivityRepositoryImpl(),
+  );
+
+  getIt.registerLazySingleton<WatchConnectivityUseCase>(
+    () => WatchConnectivityUseCase(getIt<ConnectivityRepository>()),
+  );
+
+  getIt.registerLazySingleton<ConnectivityCubit>(
+    () => ConnectivityCubit(
+      watchConnectivityUseCase: getIt<WatchConnectivityUseCase>(),
+    ),
+  );
+
   getIt.registerLazySingleton<TransactionsDataSource>(
     () => TransactionsDataSource(openTransactionsConnection()),
   );
