@@ -1,6 +1,8 @@
 import 'package:drift/drift.dart';
 import 'package:stockflow/transactions/data/models/categories.dart';
+import 'package:stockflow/transactions/data/models/sync_queue_entries.dart';
 import 'package:stockflow/transactions/data/models/transactions.dart';
+import 'package:stockflow/transactions/domain/entities/operation_type.dart';
 import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
 
 part 'transactions_data_source.g.dart';
@@ -28,12 +30,12 @@ final _defaultCategories = [
   ),
 ];
 
-@DriftDatabase(tables: [Transactions, Categories])
+@DriftDatabase(tables: [Transactions, Categories, SyncQueueEntries])
 class TransactionsDataSource extends _$TransactionsDataSource {
   TransactionsDataSource(super.executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -48,6 +50,9 @@ class TransactionsDataSource extends _$TransactionsDataSource {
       }
       if (from < 3) {
         await m.alterTable(TableMigration(transactions));
+      }
+      if (from < 4) {
+        await m.createTable(syncQueueEntries);
       }
     },
     beforeOpen: (details) async {
