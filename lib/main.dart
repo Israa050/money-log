@@ -3,10 +3,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stockflow/core/app_bloc_observer.dart';
 import 'package:stockflow/core/service_locator.dart';
 import 'package:stockflow/core/theme/app_theme.dart';
-import 'package:stockflow/transactions/bloc/balance_cubit.dart';
-import 'package:stockflow/transactions/bloc/category_totals_cubit.dart';
-import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
-import 'package:stockflow/transactions/presentation/screens/transactions_screen.dart';
+import 'package:stockflow/features/transactions/bloc/balance_cubit.dart';
+import 'package:stockflow/features/categories/bloc/category_totals_cubit.dart';
+import 'package:stockflow/features/transactions/bloc/transactions_bloc.dart';
+import 'package:stockflow/features/transactions/presentation/screens/transactions_screen.dart';
 
 void main() {
   Bloc.observer = AppBlocObserver();

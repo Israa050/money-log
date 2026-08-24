@@ -2,8 +2,8 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:stockflow/core/result.dart';
-import 'package:stockflow/transactions/bloc/categories_bloc.dart';
-import 'package:stockflow/transactions/domain/entities/category_entity.dart';
+import 'package:stockflow/features/categories/bloc/categories_bloc.dart';
+import 'package:stockflow/features/categories/domain/entities/category_entity.dart';
 
 import 'helpers/mocks.dart';
 

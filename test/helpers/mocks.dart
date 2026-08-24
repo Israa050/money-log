@@ -1,14 +1,14 @@
 import 'package:mocktail/mocktail.dart';
-import 'package:stockflow/transactions/domain/repositories/category_repository.dart';
-import 'package:stockflow/transactions/domain/repositories/transactions_repository.dart';
-import 'package:stockflow/transactions/domain/usecases/add_category_usecase.dart';
-import 'package:stockflow/transactions/domain/usecases/add_transaction_usecase.dart';
-import 'package:stockflow/transactions/domain/usecases/delete_category_usecase.dart';
-import 'package:stockflow/transactions/domain/usecases/delete_transaction_usecase.dart';
-import 'package:stockflow/transactions/domain/usecases/get_transactions_usecase.dart';
-import 'package:stockflow/transactions/domain/usecases/update_category_usecase.dart';
-import 'package:stockflow/transactions/domain/usecases/watch_balance_usecase.dart';
-import 'package:stockflow/transactions/domain/usecases/watch_categories_usecase.dart';
+import 'package:stockflow/features/categories/domain/repositories/category_repository.dart';
+import 'package:stockflow/features/transactions/domain/repositories/transactions_repository.dart';
+import 'package:stockflow/features/categories/domain/usecases/add_category_usecase.dart';
+import 'package:stockflow/features/transactions/domain/usecases/add_transaction_usecase.dart';
+import 'package:stockflow/features/categories/domain/usecases/delete_category_usecase.dart';
+import 'package:stockflow/features/transactions/domain/usecases/delete_transaction_usecase.dart';
+import 'package:stockflow/features/transactions/domain/usecases/get_transactions_usecase.dart';
+import 'package:stockflow/features/categories/domain/usecases/update_category_usecase.dart';
+import 'package:stockflow/features/transactions/domain/usecases/watch_balance_usecase.dart';
+import 'package:stockflow/features/categories/domain/usecases/watch_categories_usecase.dart';
 
 class MockTransactionsRepository extends Mock
     implements TransactionsRepository {}

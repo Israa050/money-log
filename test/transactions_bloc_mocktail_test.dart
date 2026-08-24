@@ -2,9 +2,9 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:stockflow/core/result.dart';
-import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
-import 'package:stockflow/transactions/domain/entities/transaction_entity.dart';
-import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
+import 'package:stockflow/features/transactions/bloc/transactions_bloc.dart';
+import 'package:stockflow/features/transactions/domain/entities/transaction_entity.dart';
+import 'package:stockflow/features/transactions/domain/entities/transaction_type.dart';
 
 import 'helpers/mocks.dart';
 

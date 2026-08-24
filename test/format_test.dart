@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:stockflow/transactions/presentation/format.dart';
+import 'package:stockflow/features/transactions/presentation/format.dart';
 
 void main() {
   group('formatAmountMinor', () {
