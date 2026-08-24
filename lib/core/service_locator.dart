@@ -3,25 +3,27 @@ import 'package:stockflow/core/connectivity/cubit/connectivity_cubit.dart';
 import 'package:stockflow/core/connectivity/data/connectivity_repository_impl.dart';
 import 'package:stockflow/core/connectivity/domain/connectivity_repository.dart';
 import 'package:stockflow/core/connectivity/domain/usecases/watch_connectivity_usecase.dart';
-import 'package:stockflow/transactions/bloc/balance_cubit.dart';
-import 'package:stockflow/transactions/bloc/categories_bloc.dart';
-import 'package:stockflow/transactions/bloc/category_totals_cubit.dart';
-import 'package:stockflow/transactions/bloc/transactions_bloc.dart';
-import 'package:stockflow/transactions/data/connection.dart';
-import 'package:stockflow/transactions/data/repos/category_repository_impl.dart';
-import 'package:stockflow/transactions/data/repos/transactions_repository_impl.dart';
-import 'package:stockflow/transactions/data/transactions_data_source.dart';
-import 'package:stockflow/transactions/domain/repositories/category_repository.dart';
-import 'package:stockflow/transactions/domain/repositories/transactions_repository.dart';
-import 'package:stockflow/transactions/domain/usecases/add_category_usecase.dart';
-import 'package:stockflow/transactions/domain/usecases/add_transaction_usecase.dart';
-import 'package:stockflow/transactions/domain/usecases/delete_category_usecase.dart';
-import 'package:stockflow/transactions/domain/usecases/delete_transaction_usecase.dart';
-import 'package:stockflow/transactions/domain/usecases/get_transactions_usecase.dart';
-import 'package:stockflow/transactions/domain/usecases/update_category_usecase.dart';
-import 'package:stockflow/transactions/domain/usecases/watch_balance_usecase.dart';
-import 'package:stockflow/transactions/domain/usecases/watch_categories_usecase.dart';
-import 'package:stockflow/transactions/domain/usecases/watch_category_totals_usecase.dart';
+import 'package:stockflow/core/sync/data/repos/sync_queue_repository_impl.dart';
+import 'package:stockflow/core/sync/domain/repositories/sync_queue_repository.dart';
+import 'package:stockflow/features/transactions/bloc/balance_cubit.dart';
+import 'package:stockflow/features/categories/bloc/categories_bloc.dart';
+import 'package:stockflow/features/categories/bloc/category_totals_cubit.dart';
+import 'package:stockflow/features/transactions/bloc/transactions_bloc.dart';
+import 'package:stockflow/features/transactions/data/connection.dart';
+import 'package:stockflow/features/categories/data/repos/category_repository_impl.dart';
+import 'package:stockflow/features/transactions/data/repos/transactions_repository_impl.dart';
+import 'package:stockflow/features/transactions/data/transactions_data_source.dart';
+import 'package:stockflow/features/categories/domain/repositories/category_repository.dart';
+import 'package:stockflow/features/transactions/domain/repositories/transactions_repository.dart';
+import 'package:stockflow/features/categories/domain/usecases/add_category_usecase.dart';
+import 'package:stockflow/features/transactions/domain/usecases/add_transaction_usecase.dart';
+import 'package:stockflow/features/categories/domain/usecases/delete_category_usecase.dart';
+import 'package:stockflow/features/transactions/domain/usecases/delete_transaction_usecase.dart';
+import 'package:stockflow/features/transactions/domain/usecases/get_transactions_usecase.dart';
+import 'package:stockflow/features/categories/domain/usecases/update_category_usecase.dart';
+import 'package:stockflow/features/transactions/domain/usecases/watch_balance_usecase.dart';
+import 'package:stockflow/features/categories/domain/usecases/watch_categories_usecase.dart';
+import 'package:stockflow/features/categories/domain/usecases/watch_category_totals_usecase.dart';
 
 final getIt = GetIt.instance;
 
@@ -44,13 +46,22 @@ void setupServiceLocator() {
     () => TransactionsDataSource(openTransactionsConnection()),
   );
 
+  getIt.registerLazySingleton<SyncQueueRepository>(
+    () => SyncQueueRepositoryImpl(dataSource: getIt<TransactionsDataSource>()),
+  );
+
   getIt.registerLazySingleton<TransactionsRepository>(
-    () =>
-        TransactionsRepositoryImpl(dataSource: getIt<TransactionsDataSource>()),
+    () => TransactionsRepositoryImpl(
+      dataSource: getIt<TransactionsDataSource>(),
+      syncQueueRepository: getIt<SyncQueueRepository>(),
+    ),
   );
 
   getIt.registerLazySingleton<CategoryRepository>(
-    () => CategoryRepositoryImpl(dataSource: getIt<TransactionsDataSource>()),
+    () => CategoryRepositoryImpl(
+      dataSource: getIt<TransactionsDataSource>(),
+      syncQueueRepository: getIt<SyncQueueRepository>(),
+    ),
   );
 
   getIt.registerLazySingleton<GetTransactionsUseCase>(

@@ -1,10 +1,11 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stockflow/core/result.dart';
-import 'package:stockflow/transactions/data/repos/transactions_repository_impl.dart';
-import 'package:stockflow/transactions/data/transactions_data_source.dart';
-import 'package:stockflow/transactions/domain/entities/transaction_entity.dart';
-import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
+import 'package:stockflow/core/sync/data/repos/sync_queue_repository_impl.dart';
+import 'package:stockflow/features/transactions/data/repos/transactions_repository_impl.dart';
+import 'package:stockflow/features/transactions/data/transactions_data_source.dart';
+import 'package:stockflow/features/transactions/domain/entities/transaction_entity.dart';
+import 'package:stockflow/features/transactions/domain/entities/transaction_type.dart';
 import 'package:uuid/uuid.dart';
 
 void main() {
@@ -13,7 +14,10 @@ void main() {
 
   setUp(() {
     dataSource = TransactionsDataSource(NativeDatabase.memory());
-    repository = TransactionsRepositoryImpl(dataSource: dataSource);
+    repository = TransactionsRepositoryImpl(
+      dataSource: dataSource,
+      syncQueueRepository: SyncQueueRepositoryImpl(dataSource: dataSource),
+    );
   });
 
   tearDown(() async {

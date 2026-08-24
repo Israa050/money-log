@@ -93,7 +93,9 @@ flutter run
 ```
 
 > The `build_runner` step regenerates Drift's `*.g.dart` files. Re-run it
-> whenever a table definition under `lib/transactions/data/models/` changes.
+> whenever a table definition under `lib/features/transactions/data/models/`,
+> `lib/features/categories/data/models/`, or `lib/core/sync/data/models/`
+> changes.
 
 ### Running tests
 
@@ -135,14 +137,16 @@ approach, and troubleshooting notes are in
 
 ## 🗂️ Project structure
 
-The `transactions` feature is organized feature-first:
+The app is organized feature-first under `lib/features/`, with genuinely
+cross-cutting concerns (connectivity, the offline sync queue, theming) kept
+in `lib/core/` instead of inside any one feature:
 
 ```
 lib/
 ├── core/
 │   ├── app_bloc_observer.dart     # Logs every Bloc event/state change/error
 │   ├── result.dart                # Result<T> (Success/Failure) — shared success/error wrapper
-│   ├── service_locator.dart       # get_it setup — binds TransactionsRepository, use cases, Bloc/Cubit
+│   ├── service_locator.dart       # get_it setup — binds every repository, use case, Bloc/Cubit
 │   ├── connectivity/              # Cross-cutting network-status layer (not a feature — see below)
 │   │   ├── domain/
 │   │   │   ├── network_status.dart          # online/offline enum, owned by domain
@@ -153,85 +157,146 @@ lib/
 │   │   │   └── connectivity_repository_impl.dart # Wraps connectivity_plus; maps ConnectivityResult -> NetworkStatus
 │   │   └── cubit/
 │   │       └── connectivity_cubit.dart      # Broadcasts NetworkStatus app-wide; registered as a singleton
+│   ├── sync/                      # Offline outbox layer (not a feature — see below)
+│   │   ├── domain/
+│   │   │   ├── entities/
+│   │   │   │   ├── operation_type.dart          # create/update/delete enum, owned by domain
+│   │   │   │   └── sync_queue_entry_entity.dart # Plain domain model for one queued entry (not yet consumed — no read path exists)
+│   │   │   ├── repositories/
+│   │   │   │   └── sync_queue_repository.dart   # Abstract interface — enqueue(...), watchPendingCount()
+│   │   │   └── usecases/
+│   │   │       └── watch_pending_sync_count_usecase.dart
+│   │   └── data/
+│   │       ├── models/
+│   │       │   └── sync_queue_entries.dart      # Drift table definition — id, entityType, entityId, operation, payload, createdAt
+│   │       └── repos/
+│   │           └── sync_queue_repository_impl.dart # Implements SyncQueueRepository against TransactionsDataSource
 │   └── theme/
 │       ├── app_colors.dart        # Semantic color tokens (light/dark) as a ThemeExtension
 │       └── app_theme.dart         # Builds ThemeData (app bar, cards, inputs, FAB...) from the tokens
-└── transactions/
-    ├── bloc/                      # TransactionsBloc, CategoriesBloc, events, states, BalanceCubit, CategoryTotalsCubit — depend on use cases only
-    ├── domain/
-    │   ├── entities/
-    │   │   ├── transaction_entity.dart     # Plain domain model — no Drift types; carries categoryId
-    │   │   ├── transaction_type.dart       # income/expense enum, owned by domain
-    │   │   ├── category_entity.dart        # Plain domain model — id, name, optional colorHex
-    │   │   └── category_total_entity.dart  # One category's total expense — nullable id/name for the "Uncategorized" bucket
-    │   ├── repositories/
-    │   │   ├── transactions_repository.dart  # Abstract interface — zero data-layer imports
-    │   │   └── category_repository.dart      # Abstract interface — reactive watchCategories()/watchCategoryTotals(), Result-returning CRUD writes
-    │   └── usecases/
-    │       ├── get_transactions_usecase.dart
-    │       ├── watch_balance_usecase.dart
-    │       ├── add_transaction_usecase.dart
-    │       ├── delete_transaction_usecase.dart
-    │       ├── watch_categories_usecase.dart
-    │       ├── add_category_usecase.dart
-    │       ├── update_category_usecase.dart
-    │       ├── delete_category_usecase.dart
-    │       └── watch_category_totals_usecase.dart
-    ├── data/
-    │   ├── models/
-    │   │   ├── transactions.dart  # Drift table definition (imports TransactionType from domain); categoryId FK -> Categories, ON DELETE SET NULL
-    │   │   └── categories.dart    # Drift table definition — id, name, nullable colorHex
-    │   ├── repos/
-    │   │   ├── transactions_repository_impl.dart  # Implements TransactionsRepository; maps Drift rows <-> entities
-    │   │   └── category_repository_impl.dart      # Implements CategoryRepository; maps Drift rows <-> entities, incl. CategoryTotalRow -> CategoryTotalEntity; validates name trim/empty/case-insensitive-duplicate before writing
-    │   ├── connection.dart                   # Platform-specific Drift connection
-    │   ├── transactions_data_source.dart     # Drift database class (real persistence, schema v3); seeds 4 default categories on create; category CRUD + categoryTotals join query
-    │   └── transactions_data_source.g.dart   # Generated by drift_dev — do not edit
-    └── presentation/
-        ├── format.dart                         # Amount/date formatting + parseHexColor helper (shared by every widget below)
-        ├── category_palette.dart               # Fixed 12-swatch hex palette used by the category editor
-        ├── screens/
-        │   ├── transactions_screen.dart        # Main screen: composes the widgets below; app bar action opens CategoriesScreen
-        │   └── categories_screen.dart          # Manage-categories screen: list + add/edit/delete
-        └── widgets/
-            ├── add_transaction_sheet.dart       # Bottom sheet for creating a transaction
-            ├── balance_summary_card.dart        # Balance figure + income/expense stat pills
-            ├── category_totals_card.dart        # Collapsible spending-by-category card, reactive via CategoryTotalsCubit
-            ├── category_list_tile.dart          # One row on CategoriesScreen: color dot, name, edit/delete icon buttons
-            ├── category_editor_sheet.dart       # Bottom sheet for creating or editing a category (name + palette picker)
-            ├── delete_category_dialog.dart      # Confirmation dialog warning that orphaned transactions become "Uncategorized"
-            ├── stat_pill.dart                   # Single income/expense mini stat
-            ├── transaction_tile.dart            # Swipe-to-delete row; shows a category pill when categoryId resolves
-            ├── transactions_list.dart           # List/empty-state switch; resolves each row's category by id before rendering
-            ├── transactions_empty_state.dart    # "No transactions yet" placeholder
-            └── undo_snackbar_content.dart        # Snackbar body with a shrinking countdown bar
+└── features/
+    ├── transactions/
+    │   ├── bloc/                  # TransactionsBloc, BalanceCubit — depend on use cases only
+    │   ├── domain/
+    │   │   ├── entities/
+    │   │   │   ├── transaction_entity.dart     # Plain domain model — no Drift types; carries categoryId
+    │   │   │   └── transaction_type.dart       # income/expense enum, owned by domain
+    │   │   ├── repositories/
+    │   │   │   └── transactions_repository.dart  # Abstract interface — zero data-layer imports
+    │   │   └── usecases/
+    │   │       ├── get_transactions_usecase.dart
+    │   │       ├── watch_balance_usecase.dart
+    │   │       ├── add_transaction_usecase.dart
+    │   │       └── delete_transaction_usecase.dart
+    │   ├── data/
+    │   │   ├── models/
+    │   │   │   └── transactions.dart  # Drift table definition (imports TransactionType from domain); categoryId FK -> Categories, ON DELETE SET NULL
+    │   │   ├── repos/
+    │   │   │   └── transactions_repository_impl.dart  # Implements TransactionsRepository; maps Drift rows <-> entities; every write is wrapped in one atomic Drift transaction() alongside a SyncQueueRepository.enqueue() call
+    │   │   ├── connection.dart                   # Platform-specific Drift connection
+    │   │   ├── transactions_data_source.dart     # The single Drift database class (real persistence, schema v4) for Transactions, Categories, AND SyncQueueEntries — see note below
+    │   │   └── transactions_data_source.g.dart   # Generated by drift_dev — do not edit
+    │   └── presentation/
+    │       ├── format.dart                         # Amount/date formatting + parseHexColor helper (shared across features)
+    │       ├── screens/
+    │       │   └── transactions_screen.dart        # Main screen: composes the widgets below; app bar action opens CategoriesScreen
+    │       └── widgets/
+    │           ├── add_transaction_sheet.dart       # Bottom sheet for creating a transaction
+    │           ├── balance_summary_card.dart        # Balance figure + income/expense stat pills
+    │           ├── stat_pill.dart                   # Single income/expense mini stat
+    │           ├── transaction_tile.dart            # Swipe-to-delete row; shows a category pill when categoryId resolves
+    │           ├── transactions_list.dart           # List/empty-state switch; resolves each row's category by id before rendering
+    │           ├── transactions_empty_state.dart    # "No transactions yet" placeholder
+    │           └── undo_snackbar_content.dart        # Snackbar body with a shrinking countdown bar
+    └── categories/
+        ├── bloc/
+        │   ├── categories_bloc.dart        # Owns category CRUD; separate from TransactionsBloc, which only reads categories
+        │   ├── categories_event.dart
+        │   ├── categories_state.dart
+        │   └── category_totals_cubit.dart  # Aggregate-stream cubit shaped like BalanceCubit
+        ├── domain/
+        │   ├── entities/
+        │   │   ├── category_entity.dart        # Plain domain model — id, name, optional colorHex
+        │   │   └── category_total_entity.dart  # One category's total expense — nullable id/name for the "Uncategorized" bucket
+        │   ├── repositories/
+        │   │   └── category_repository.dart      # Abstract interface — reactive watchCategories()/watchCategoryTotals(), Result-returning CRUD writes
+        │   └── usecases/
+        │       ├── watch_categories_usecase.dart
+        │       ├── add_category_usecase.dart
+        │       ├── update_category_usecase.dart
+        │       ├── delete_category_usecase.dart
+        │       └── watch_category_totals_usecase.dart
+        ├── data/
+        │   ├── models/
+        │   │   └── categories.dart    # Drift table definition — id, name, nullable colorHex
+        │   └── repos/
+        │       └── category_repository_impl.dart  # Implements CategoryRepository against TransactionsDataSource; maps Drift rows <-> entities, incl. CategoryTotalRow -> CategoryTotalEntity; validates name trim/empty/case-insensitive-duplicate; every write wrapped in an atomic transaction() + enqueue()
+        └── presentation/
+            ├── category_palette.dart               # Fixed 12-swatch hex palette used by the category editor
+            ├── screens/
+            │   └── categories_screen.dart          # Manage-categories screen: list + add/edit/delete
+            └── widgets/
+                ├── category_totals_card.dart        # Collapsible spending-by-category card, reactive via CategoryTotalsCubit
+                ├── category_list_tile.dart          # One row on CategoriesScreen: color dot, name, edit/delete icon buttons
+                ├── category_editor_sheet.dart       # Bottom sheet for creating or editing a category (name + palette picker)
+                └── delete_category_dialog.dart      # Confirmation dialog warning that orphaned transactions become "Uncategorized"
 ```
+
+> **Why `Categories` and `SyncQueueEntries` live inside
+> `transactions_data_source.dart` instead of their own feature's `data/`
+> folder:** Drift transactions and foreign keys cannot span two separate
+> `@DriftDatabase` classes — there is exactly one SQLite connection/file for
+> the whole app, `transactions.sqlite`, and every table shares it. The table
+> *definitions* (`categories.dart`, `sync_queue_entries.dart`) live under
+> their own feature/module folder and are just imported into
+> `transactions_data_source.dart`'s `@DriftDatabase(tables: [...])` list —
+> only the physical database class itself has to be shared. This is what
+> makes the atomic-write guarantee below possible: a transaction row and its
+> sync-queue row can be written in one Drift `transaction()` block only
+> because they're on the same connection.
 
 ### Layering
 
-Dependencies point inward, toward `domain/`:
+Dependencies point inward, toward `domain/`, within each feature — and
+`core/sync` sits underneath every feature that writes data:
 
 ```
 presentation → bloc → domain/usecases → domain/repositories (abstract)
                                               ^
                                               |
                                 data/repos (implements the interface)
+                                              |
+                                              v
+                                  core/sync: SyncQueueRepository (abstract)
+                                              ^
+                                              |
+                                core/sync/data/repos (implements the interface)
 ```
 
-- **`domain/`** has zero imports from `data/` — `TransactionEntity`, `TransactionType`,
-  and `TransactionsRepository` (the abstract interface) are plain Dart with no
+- **`domain/`** has zero imports from `data/` in any feature — `TransactionEntity`,
+  `TransactionType`, `TransactionsRepository` (the abstract interface), and
+  the equivalents in `categories/` and `core/sync/` are plain Dart with no
   Drift types anywhere in their signatures.
-- **`TransactionsRepositoryImpl`** (in `data/repos/`) is the only place that
-  knows both worlds: it implements the domain interface and maps Drift's
-  generated `Transaction` rows to/from `TransactionEntity`.
+- **`TransactionsRepositoryImpl`** and **`CategoryRepositoryImpl`** (in each
+  feature's `data/repos/`) are the only places that know both worlds: they
+  implement their domain interface, map Drift's generated rows to/from
+  entities, *and* coordinate the atomic write + sync-queue-enqueue described
+  below.
 - **Use cases** (`domain/usecases/`) are thin, single-method wrappers around
-  one repository call each — `TransactionsBloc`/`BalanceCubit` depend only on
-  these, never on `TransactionsRepository` or `TransactionsRepositoryImpl`
-  directly.
-- **DI** (`service_locator.dart`) binds `TransactionsRepositoryImpl` against
-  the abstract `TransactionsRepository` type, so swapping the persistence
-  layer later would mean writing a new impl class, not touching the bloc,
-  use cases, or domain entities at all.
+  one repository call each — blocs/cubits depend only on these, never on a
+  repository interface or impl directly.
+- **`SyncQueueRepository`** is depended on by `TransactionsRepositoryImpl`
+  and `CategoryRepositoryImpl` the same way any repository depends on
+  another narrow interface — those repositories know `enqueue(entityType:,
+  entityId:, operation:, payload:)`, never `SyncQueueEntries`'s Drift schema
+  or how a queue row's `id`/`createdAt` are generated. This keeps every
+  future repository that needs to enqueue (there will be more than these
+  two) from duplicating `SyncQueueEntriesCompanion`-building logic — that
+  knowledge lives in exactly one place, `SyncQueueRepositoryImpl`.
+- **DI** (`service_locator.dart`) binds every `*Impl` against its abstract
+  interface type, so swapping the persistence layer later would mean
+  writing a new impl class, not touching any bloc, use case, or domain
+  entity at all.
 
 ## 🔄 Reactive data flow
 
@@ -349,6 +414,75 @@ This gives a full console trace of the reactive cycle above — useful for
 seeing exactly when a stream tick reaches the Bloc versus when a write
 handler runs.
 
+### Offline sync queue (transactional outbox)
+
+Every write to `Transactions` or `Categories` also writes a row to
+`SyncQueueEntries` — the local durable record of "this needs to reach the
+server eventually." This is a **transactional outbox**: the pattern of
+writing a business-data change and an "outbox" event in one atomic
+transaction, so a separate background process can drain the outbox and
+publish those events (here, to Supabase) without ever risking the data
+change and the sync record disagreeing about what happened. The actual
+background drain/push-to-Supabase process is not built yet — only the write
+side (the outbox itself) exists so far.
+
+- **Every write always enqueues, online or offline.** There is exactly one
+  code path for every write: local DB write, then enqueue — never a
+  connectivity check that branches into "write directly to the server" vs.
+  "queue it." A background sync process (not yet built) is the only thing
+  that will ever talk to Supabase; from the repository's point of view,
+  being online changes nothing about how a write happens, only how soon the
+  eventual drain might run. This was a deliberate choice over branching on
+  connectivity: a single path is easier to test and reason about, and it
+  sidesteps a real failure mode the branching approach can't avoid — being
+  "online" at write time doesn't guarantee a direct network write actually
+  succeeds, so the offline/fallback path would need to exist and be correct
+  regardless.
+- **The data write and the enqueue are wrapped in one Drift `transaction()`.**
+  `TransactionsRepositoryImpl.addTransaction`/`deleteTransaction` and
+  `CategoryRepositoryImpl.addCategory`/`updateCategory`/`deleteCategory` each
+  open `dataSource.transaction(() async { ... })`, perform the actual
+  insert/update/delete, then call `syncQueueRepository.enqueue(...)` before
+  the block closes. If either half fails, Drift rolls back both — there is
+  no window where a transaction/category row exists with no matching queue
+  entry (which would mean it silently never syncs), and no window where a
+  queue entry exists for a write that never actually committed (a "phantom"
+  sync). Because `enqueue()` returns a `Result<int>` rather than throwing,
+  and Drift's `transaction()` only rolls back on a *thrown* exception, a
+  returned `Failure` from `enqueue` is deliberately re-thrown inside the
+  transaction block and re-caught just outside it, converting it back to
+  `Result` for the caller — see the comment at the throw site in
+  `transactions_repository_impl.dart` for why.
+- **`payload` is a full snapshot, captured at write time — not a pointer to
+  re-fetch later.** `SyncQueueEntries.payload` holds a JSON-encoded copy of
+  the entity's data (id, amount, type, note, category, etc. for a
+  transaction) at the moment of the write, not just the row's id. The
+  alternative — storing only `entityId` and having the eventual drain
+  process re-read the current row from local storage — was rejected because
+  this app is offline-first by design: a write can sit unsynced for an
+  unbounded time, and if the underlying row gets deleted locally before the
+  drain ever runs, a pointer-based design would have nothing left to
+  re-fetch and would silently lose that `create`/`update` event. A snapshot
+  is self-sufficient — the queue row alone has everything needed to replay
+  the write, independent of whatever local storage looks like by the time
+  it's drained.
+- **`SyncQueueRepository` is the only place that knows how to build a queue
+  row.** Callers (`TransactionsRepositoryImpl`, `CategoryRepositoryImpl`)
+  pass plain values — `entityType`, `entityId`, `operation`, `payload` —
+  never a `SyncQueueEntriesCompanion`. `id` (a generated UUID) and
+  `createdAt` (a Drift-side default, `withDefault(currentDateAndTime)`, the
+  same pattern `Transactions.occurredTime` uses) are owned entirely by
+  `SyncQueueRepositoryImpl`, so a third repository added later needs zero
+  knowledge of the queue table's schema to participate — just the same
+  four-value `enqueue(...)` call every existing writer already makes.
+- **What's still open:** the background process that actually drains
+  `SyncQueueEntries` and pushes to Supabase does not exist yet, and there is
+  no `synced`/status column on the table — every row currently counts as
+  "pending" by definition, since nothing marks or removes a row once it's
+  been enqueued. `SyncQueueRepository.watchPendingCount()` (backed by a
+  `COUNT(*)` over the table) reflects that: it's a true pending count today
+  only because nothing has drained anything yet.
+
 ## 🗄️ Database schema
 
 ```mermaid
@@ -367,8 +501,23 @@ erDiagram
         TEXT name
         TEXT colorHex "nullable, e.g. '#FF9800'"
     }
+    SYNC_QUEUE_ENTRIES {
+        TEXT id PK "UUID, generated client-side by SyncQueueRepositoryImpl"
+        TEXT entityType "e.g. 'transaction', 'category' -- not an FK, just a label"
+        TEXT entityId "id of the row that changed, in whichever table entityType names"
+        TEXT operation "enum: create | update | delete"
+        TEXT payload "JSON snapshot of the entity at write time"
+        DATETIME createdAt "defaults to now, via withDefault(currentDateAndTime)"
+    }
     TRANSACTIONS }o--o| CATEGORIES : "categorized as"
 ```
+
+`SyncQueueEntries` deliberately has **no foreign key** to `Transactions` or
+`Categories` — `entityType`/`entityId` are a soft reference by design, since
+the whole point of the outbox is to keep a durable, replay-safe record of a
+write that must survive the original row being deleted before the queue is
+ever drained (see [Offline sync queue](#offline-sync-queue-transactional-outbox)
+above).
 
 ### Design decisions
 
@@ -499,6 +648,33 @@ erDiagram
   the `TypedResult` → plain-object mapping at the data source boundary keeps
   every Drift-specific type — including `TypedResult` itself — from ever
   crossing into `data/repos/`, `domain/`, or above.
+- **`SyncQueueEntries` was added as schema v4** (`onUpgrade`'s
+  `if (from < 4) { await m.createTable(syncQueueEntries); }`) rather than
+  bundled into the v3 migration. It's an independent table with no foreign
+  keys to `Transactions`/`Categories` (see [Database schema](#-database-schema)
+  above for why the reference is deliberately soft), so a plain
+  `createTable` was sufficient — no `TableMigration`/rebuild needed the way
+  `categoryId`'s FK change required.
+- **`SyncQueueEntries.createdAt` uses `withDefault(currentDateAndTime)`,
+  not a Dart-side `DateTime.now()` passed in by the repository.** Matches
+  `Transactions.occurredTime`/`creationTime`'s existing convention of
+  letting the database stamp insert time rather than the caller — keeps
+  `SyncQueueRepositoryImpl.enqueue`'s `Companion.insert(...)` call from
+  needing to pass a timestamp at all.
+- **The codebase is organized under `lib/features/` (`transactions/`,
+  `categories/`) plus `lib/core/` (`connectivity/`, `sync/`, `theme/`),
+  rather than one flat `lib/transactions/` containing everything** (an
+  earlier structure this app briefly had). `categories/` was extracted from
+  `transactions/` once it became clear category CRUD, its bloc, and its
+  screens don't need to know anything about transactions — but the split is
+  intentionally partial: `Categories`, `SyncQueueEntries`, and the joined
+  `categoryTotals` query all still live inside
+  `transactions_data_source.dart`, because Drift's transaction/FK
+  guarantees require every table sharing those guarantees to be in one
+  `@DriftDatabase` class. Moving the *files* into `features/categories/` and
+  `core/sync/` doesn't remove that coupling — it just makes explicit which
+  parts of the app are genuinely feature-local (CRUD, bloc, screens) versus
+  genuinely shared (the database class itself, cross-table queries).
 
 ## ✅ What's implemented
 
@@ -509,8 +685,8 @@ erDiagram
   wrapper with a `when(success:, failure:)` method, used for write results
   (`addTransaction`, `deleteTransaction`) instead of letting exceptions
   propagate.
-- A domain layer (`lib/transactions/domain/`) that decouples the bloc from
-  Drift entirely:
+- A domain layer (`lib/features/transactions/domain/`) that decouples the
+  bloc from Drift entirely:
   - `TransactionEntity` / `TransactionType` — plain Dart models with no
     Drift dependency.
   - `TransactionsRepository` — the abstract interface the domain and bloc
@@ -592,6 +768,35 @@ erDiagram
     one shared app-wide instance rather than a fresh one per screen.
   - Not yet consumed anywhere in the UI (no `BlocProvider`, no offline
     banner) — see [Not yet done](#-not-yet-done).
+- **Offline sync queue / transactional outbox (new):** a core, cross-cutting
+  layer under `lib/core/sync/` recording every write to `Transactions` and
+  `Categories` so it can be pushed to Supabase later — see
+  [Offline sync queue](#offline-sync-queue-transactional-outbox) above for
+  the full design rationale (always-enqueue, atomic transaction + enqueue,
+  snapshot payload).
+  - `SyncQueueEntries` Drift table (`id`, `entityType`, `entityId`,
+    `operation`, `payload`, `createdAt`), schema v4, added via a plain
+    `createTable` migration step (no FK to migrate around).
+  - `OperationType` enum (`create`/`update`/`delete`), `SyncQueueRepository`/
+    `SyncQueueRepositoryImpl` with an `enqueue(entityType:, entityId:,
+    operation:, payload:)` method — `id`/`createdAt` generated internally,
+    never by the caller — and a `watchPendingCount()` stream backed by a
+    `COUNT(*)` query.
+  - `TransactionsRepositoryImpl.addTransaction`/`deleteTransaction` and
+    `CategoryRepositoryImpl.addCategory`/`updateCategory`/`deleteCategory`
+    all wrap their write and a `syncQueueRepository.enqueue(...)` call in
+    one Drift `transaction()`, with a `Failure` result re-thrown inside the
+    block to force a rollback (Drift only rolls back on a thrown exception,
+    not a returned value) and re-caught just outside to restore the
+    `Result<T>` contract callers expect.
+  - `WatchPendingSyncCountUseCase` wraps `watchPendingCount()` the same way
+    `WatchBalanceUseCase` wraps `watchBalance()` — not yet registered in
+    `service_locator.dart` or consumed by any bloc/UI, since nothing
+    displays a pending-sync count yet.
+  - **Not yet built:** the actual background process that drains
+    `SyncQueueEntries` and pushes to Supabase, and a `synced`/status column
+    to distinguish drained rows from pending ones — every row currently
+    counts as pending by definition. See [Not yet done](#-not-yet-done).
 - `AppBlocObserver` — logs every Bloc event, state change, and error via the
   `logger` package.
 - Full presentation layer: transactions screen with balance summary,
@@ -669,8 +874,42 @@ erDiagram
 - `ConnectivityCubit` exists and is registered in `get_it`, but nothing in
   the widget tree provides or listens to it yet — no offline banner, no
   action gated on network state.
+- The sync queue (`SyncQueueEntries`) only has a write side. There is no
+  background process draining it and pushing to Supabase, no `synced`/status
+  column to tell a drained row from a pending one (every row currently
+  counts as pending), and `WatchPendingSyncCountUseCase` isn't wired into
+  `service_locator.dart` or shown anywhere in the UI yet.
+- Only `Transactions` and `Categories` writes enqueue to the sync queue —
+  there is no actual Supabase client/project wired up anywhere in the app
+  yet, so "sync" today means "durably recorded locally," not "reached the
+  server."
 
 ## 🏷️ Release notes
+
+### Unreleased — Offline sync queue (outbox)
+
+- Added `lib/core/sync/`: a `SyncQueueEntries` Drift table (schema v4) plus
+  `OperationType`, `SyncQueueRepository`/`Impl`, and
+  `WatchPendingSyncCountUseCase` — the write side of a transactional
+  outbox for later Supabase sync. See
+  [Offline sync queue](#offline-sync-queue-transactional-outbox) for the
+  full design writeup (always-enqueue over connectivity-branching, atomic
+  transaction + enqueue, snapshot-vs-pointer payload).
+- `TransactionsRepositoryImpl` and `CategoryRepositoryImpl` now wrap every
+  write (`add`/`update`/`delete`) in a Drift `transaction()` alongside a
+  `syncQueueRepository.enqueue(...)` call, so a transaction/category row and
+  its sync-queue record either both commit or neither does.
+- Reorganized the codebase from a single `lib/transactions/` folder into
+  `lib/features/{transactions,categories}/` plus `lib/core/{connectivity,sync,theme}/`
+  — `categories/` now has its own `bloc/domain/data/presentation` layers,
+  separate from `transactions/`. The Drift database class itself
+  (`transactions_data_source.dart`) still hosts the `Categories` and
+  `SyncQueueEntries` table definitions alongside `Transactions`, since
+  Drift's transaction/FK guarantees require every table sharing them to be
+  in one `@DriftDatabase` class — only the table *definition files* and the
+  surrounding CRUD/bloc/UI code moved.
+- Background drain-to-Supabase process not built yet — see
+  [Not yet done](#-not-yet-done).
 
 ### Unreleased — Connectivity layer
 

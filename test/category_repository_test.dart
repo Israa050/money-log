@@ -1,10 +1,12 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stockflow/core/result.dart';
-import 'package:stockflow/transactions/data/repos/category_repository_impl.dart';
-import 'package:stockflow/transactions/data/repos/transactions_repository_impl.dart';
-import 'package:stockflow/transactions/data/transactions_data_source.dart';
-import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
+import 'package:stockflow/core/sync/data/repos/sync_queue_repository_impl.dart';
+import 'package:stockflow/core/sync/domain/repositories/sync_queue_repository.dart';
+import 'package:stockflow/features/categories/data/repos/category_repository_impl.dart';
+import 'package:stockflow/features/transactions/data/repos/transactions_repository_impl.dart';
+import 'package:stockflow/features/transactions/data/transactions_data_source.dart';
+import 'package:stockflow/features/transactions/domain/entities/transaction_type.dart';
 import 'package:uuid/uuid.dart';
 
 // Every test here runs against a fresh in-memory database that already
@@ -13,13 +15,21 @@ import 'package:uuid/uuid.dart';
 // created within the test rather than assuming an empty table.
 void main() {
   late TransactionsDataSource dataSource;
+  late SyncQueueRepository syncQueueRepository;
   late CategoryRepositoryImpl repository;
   late TransactionsRepositoryImpl transactionsRepository;
 
   setUp(() {
     dataSource = TransactionsDataSource(NativeDatabase.memory());
-    repository = CategoryRepositoryImpl(dataSource: dataSource);
-    transactionsRepository = TransactionsRepositoryImpl(dataSource: dataSource);
+    syncQueueRepository = SyncQueueRepositoryImpl(dataSource: dataSource);
+    repository = CategoryRepositoryImpl(
+      dataSource: dataSource,
+      syncQueueRepository: syncQueueRepository,
+    );
+    transactionsRepository = TransactionsRepositoryImpl(
+      dataSource: dataSource,
+      syncQueueRepository: syncQueueRepository,
+    );
   });
 
   tearDown(() async {

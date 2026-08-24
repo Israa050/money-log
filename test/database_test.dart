@@ -1,8 +1,8 @@
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:stockflow/transactions/data/transactions_data_source.dart';
-import 'package:stockflow/transactions/domain/entities/transaction_type.dart';
+import 'package:stockflow/features/transactions/data/transactions_data_source.dart';
+import 'package:stockflow/features/transactions/domain/entities/transaction_type.dart';
 import 'package:uuid/uuid.dart';
 
 void main() {
