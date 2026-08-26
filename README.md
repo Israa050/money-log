@@ -66,6 +66,7 @@ delete with a countdown undo.
 - 👉 **Swipe to delete** — swipe a row away, then **Undo** within a 5-second countdown before it's permanently deleted
 - 🔄 **Fully reactive** — every screen is driven by a live Drift stream; add/delete never trigger a manual reload
 - 💾 **Local persistence** — everything is stored in an on-device SQLite database via Drift
+- 📤 **Export data** — an app-bar action serializes every transaction and category to a single JSON file (off the main isolate) and opens the OS share sheet, doubling as a manual backup for this offline-first app
 - 🪵 **Bloc observability** — every event and state transition is logged through a custom `BlocObserver`
 - 🎨 **Themed design system** — light/dark color tokens (`AppColors`), a distinct income/expense
   palette, and a small, composable widget set instead of one large screen file
@@ -78,6 +79,7 @@ delete with a countdown undo.
 | Persistence    | [drift](https://pub.dev/packages/drift) (SQLite)               |
 | DI             | [get_it](https://pub.dev/packages/get_it)                     |
 | Connectivity   | [connectivity_plus](https://pub.dev/packages/connectivity_plus) |
+| Sharing        | [share_plus](https://pub.dev/packages/share_plus) (export file → OS share sheet) |
 | IDs            | [uuid](https://pub.dev/packages/uuid) (client-generated v4)   |
 | Logging        | [logger](https://pub.dev/packages/logger)                     |
 | Testing        | [bloc_test](https://pub.dev/packages/bloc_test) + [mocktail](https://pub.dev/packages/mocktail) |
@@ -240,6 +242,23 @@ lib/
                 ├── category_list_tile.dart          # One row on CategoriesScreen: color dot, name, edit/delete icon buttons
                 ├── category_editor_sheet.dart       # Bottom sheet for creating or editing a category (name + palette picker)
                 └── delete_category_dialog.dart      # Confirmation dialog warning that orphaned transactions become "Uncategorized"
+    └── backup/
+        ├── cubit/
+        │   ├── export_cubit.dart            # ExportCubit -- single export() method, one ExportDataUseCase dependency
+        │   └── export_state.dart            # ExportState: Idle / InProgress / Success(file) / Failure(message)
+        ├── domain/
+        │   ├── entities/
+        │   │   ├── exportable_source.dart   # Abstract source contract -- key + exportRows(); the OCP seam (see below)
+        │   │   └── exported_file.dart       # Plain result value -- path, byteSize, countsByKey
+        │   ├── backup_repository.dart       # Abstract interface -- exportToJson() is its only method
+        │   └── usecases/
+        │       └── export_data_usecase.dart # Thin call() wrapper around BackupRepository.exportToJson()
+        ├── data/
+        │   ├── export_serializer.dart       # Pure functions (no Flutter/Drift imports) -- buildEnvelope + encodeExport, the Isolate.run payload
+        │   └── backup_repository_impl.dart  # Implements BackupRepository; loops ExportableSources, spawns the isolate, writes the temp file
+        └── presentation/
+            └── widgets/
+                └── export_action.dart       # App bar IconButton; BlocConsumer drives spinner/snackbars and the share_plus call
 ```
 
 > **Why `Categories` and `SyncQueueEntries` live inside
@@ -482,6 +501,84 @@ side (the outbox itself) exists so far.
   been enqueued. `SyncQueueRepository.watchPendingCount()` (backed by a
   `COUNT(*)` over the table) reflects that: it's a true pending count today
   only because nothing has drained anything yet.
+
+### Export data (manual backup)
+
+An app-bar action (`ExportAction`, next to "Manage categories" on
+`TransactionsScreen`) serializes every transaction and category into one
+JSON file and hands it to the OS share sheet via `share_plus`. This is
+**not** the sync queue above — the outbox replays individual writes to a
+future server; export is a user-triggered, point-in-time snapshot of
+current state, read fresh from the database and independent of whatever is
+sitting unsynced in `SyncQueueEntries`. For an offline-first app with no
+server yet, this is the only real backup path a user has today.
+
+- **A new `backup/` feature, not folded into `transactions/` or
+  `categories/`.** Export reads across both features' domains, and neither
+  should have to import the other's entities just to support a
+  cross-cutting capability — so `backup/` is its own feature, the one
+  place allowed to depend on both, while nothing depends on it.
+- **`ExportableSource` is the Open/Closed seam.** `BackupRepositoryImpl`
+  takes a `List<ExportableSource>` in its constructor and never imports
+  `TransactionsRepository` or `CategoryRepository` directly — it only
+  knows `source.key` (a string used as the JSON key) and
+  `source.exportRows()` (a `Future<List<Map<String, Object?>>>`).
+  `TransactionsExportSource` and `CategoriesExportSource` (living beside
+  each feature's own repository impl, in `data/repos/`) are the only two
+  places that know how to turn a `TransactionEntity`/`CategoryEntity` into
+  a plain map. Adding a third exportable table later — a future
+  `BudgetsExportSource`, say — means writing one new class and adding one
+  line to the `sources: [...]` list in `service_locator.dart`;
+  `BackupRepositoryImpl` itself never needs to change.
+- **Only the JSON encode runs on a background isolate — not the DB read.**
+  `BackupRepositoryImpl.exportToJson()` calls each source's `exportRows()`
+  on the main isolate first (cheap: a handful of repository/Drift calls),
+  collects the results into one `Map<String, List<Map<String, Object?>>>`,
+  then hands only that plain, isolate-safe data to
+  `await Isolate.run(() => encodeExport(sourceData))`. `encodeExport` and
+  `buildEnvelope` (`lib/features/backup/data/export_serializer.dart`) are
+  deliberately pure top-level functions with no Flutter or Drift imports —
+  nothing they close over is tied to the main isolate, and they're
+  unit-testable with no database or widget tree at all. The honest caveat:
+  `jsonEncode` is not always the expensive half of an export — row mapping
+  and the Drift read can cost as much or more for a given dataset size: if
+  a benchmark ever shows the query itself dominating, the isolate boundary
+  can move earlier (e.g. `Drift`'s `computeWithDatabase`) without changing
+  `BackupRepository`'s interface.
+- **The envelope has its own `formatVersion`, separate from Drift's
+  `schemaVersion`.** The two can change independently: a new export field
+  bumps `formatVersion`; a new table/column bumps the database's
+  `schemaVersion` (currently 4, recorded in the envelope only as
+  diagnostic info). `'counts'` in the envelope is computed generically —
+  `sourceData.map((key, rows) => MapEntry(key, rows.length))` — so it
+  reflects however many sources actually ran, with no hardcoded field per
+  table.
+- **Timestamps are ISO-8601 UTC strings; `amountMinor` stays an integer.**
+  Same reasoning as the database schema itself (see
+  [Design decisions](#design-decisions) below): JSON has no native date
+  type, so `DateTime` must become a string at the export boundary, and UTC
+  keeps it unambiguous across devices/timezones. Emitting a decimal amount
+  instead of minor units would reintroduce exactly the floating-point
+  drift the schema was designed to avoid.
+- **The file is written to the OS temp directory, not app documents.**
+  `getTemporaryDirectory()` (via `path_provider`, already a dependency),
+  because the file is a transient hand-off to the share sheet — not app
+  state Money Log owns or needs to keep around after the user has saved it
+  somewhere else.
+- **`ExportCubit` has exactly one public method, `export()`, and an
+  in-flight guard (`if (state is ExportInProgress) return;`).** Matches
+  `BalanceCubit`/`CategoryTotalsCubit`'s choice of `Cubit` over `Bloc` —
+  one action, no event vocabulary needed. Unlike every other write in this
+  app (`AddTransactionEvent`, `AddCategoryEvent`, ...), which emit nothing
+  on success because a live Drift stream updates the UI instead, export
+  has no such stream: `ExportSuccess(file)` is the only signal the UI will
+  ever get, so the use case's return value has to be carried into state
+  directly.
+- **Not yet built:** import/restore (the envelope's `formatVersion` and
+  category-first field ordering are designed to make this possible later,
+  but no reader exists yet), CSV export, scheduled/automatic backups, and
+  encryption — the exported file is plaintext financial data, which is
+  worth knowing before sharing it through the OS share sheet.
 
 ## 🗄️ Database schema
 
@@ -864,6 +961,42 @@ above).
     `WatchBalanceUseCase`: initial state is `0` before the stream emits, a
     single stream value is re-emitted as-is, and multiple stream values are
     emitted in order.
+- **Export data (new):** a new `lib/features/backup/` feature — see
+  [Export data](#export-data-manual-backup) above for the full design
+  writeup (the `ExportableSource`/OCP seam, the isolate boundary, the
+  envelope format).
+  - `ExportableSource` (abstract) plus `TransactionsExportSource` and
+    `CategoriesExportSource` (living beside each feature's own repository
+    impl), each mapping its entities to plain `Map<String, Object?>` rows.
+  - `TransactionsRepository`/`CategoryRepository` grew one-shot
+    `getAllTransactionsOnce()`/`getAllCategoriesOnce()` methods (`Future`,
+    not `Stream`) purely for this snapshot read — every other read on
+    these repositories stays reactive.
+  - `export_serializer.dart` (`buildEnvelope`/`encodeExport`), pure
+    functions with no Flutter/Drift imports, run inside `Isolate.run` by
+    `BackupRepositoryImpl.exportToJson()`, which also writes the resulting
+    JSON to a temp file and returns `Result<ExportedFile>`.
+  - `ExportDataUseCase` and `ExportCubit` (`Idle`/`InProgress`/
+    `Success(file)`/`Failure(message)`) follow the same shapes as every
+    other use case/cubit in this codebase; both are registered in
+    `service_locator.dart` alongside the two named `ExportableSource`
+    instances (`get_it` requires `instanceName` here since two concrete
+    types are registered under one abstract type).
+  - `ExportAction`, an app-bar `IconButton` next to "Manage categories" on
+    `TransactionsScreen`, wraps its own `BlocProvider<ExportCubit>` so it's
+    a self-contained drop-in. It shows a spinner while `ExportInProgress`
+    and a result snackbar on `Success`/`Failure`.
+  - **Not wired to actually trigger yet:** `ExportAction`'s button
+    `onPressed` is currently a no-op — the call to
+    `context.read<ExportCubit>().export()` is written but commented out —
+    so every layer beneath it (cubit → use case → repository → sources →
+    isolate → file write) is implemented and passes `flutter analyze`, but
+    tapping the button in the running app does nothing yet. Re-enabling it
+    is a one-line change once the remaining checklist items below are
+    ready.
+  - **No dedicated tests yet** for the serializer, `BackupRepositoryImpl`,
+    or `ExportCubit` — `test/widget_test.dart` was updated only far enough
+    to register the new DI graph so the app still boots in tests.
 
 ## 🚧 Not yet done
 
@@ -883,6 +1016,12 @@ above).
   there is no actual Supabase client/project wired up anywhere in the app
   yet, so "sync" today means "durably recorded locally," not "reached the
   server."
+- **Export data's button doesn't trigger an export yet** — `ExportAction`'s
+  `onPressed` is a deliberate no-op for now (see
+  [What's implemented](#-whats-implemented) above); the cubit/use
+  case/repository/serializer chain beneath it is complete and analyzer-clean
+  but has no unit tests, hasn't been exercised on a real device, and has no
+  import/restore counterpart, CSV option, scheduled backups, or encryption.
 
 ## 🏷️ Release notes
 

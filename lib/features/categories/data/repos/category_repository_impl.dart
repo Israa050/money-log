@@ -35,6 +35,12 @@ class CategoryRepositoryImpl extends CategoryRepository {
   }
 
   @override
+  Future<List<CategoryEntity>> getAllCategoriesOnce() async {
+    final rows = await dataSource.getAllCategoriesOnce();
+    return rows.map(_toEntity).toList();
+  }
+
+  @override
   Stream<List<CategoryTotalEntity>> watchCategoryTotals() {
     return dataSource.categoryTotals.map(
       (rows) => rows.map(_toCategoryTotalEntity).toList(),

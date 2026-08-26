@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:stockflow/features/backup/presentation/widgets/export_action.dart';
 import 'package:stockflow/features/transactions/bloc/transactions_bloc.dart';
 import 'package:stockflow/features/categories/domain/entities/category_entity.dart';
 import 'package:stockflow/features/transactions/domain/entities/transaction_entity.dart';
@@ -76,6 +77,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       appBar: AppBar(
         title: const Text('Transactions'),
         actions: [
+          const ExportAction(),
           IconButton(
             icon: const Icon(Icons.label_outline),
             tooltip: 'Manage categories',
