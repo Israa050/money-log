@@ -4,11 +4,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:stockflow/core/service_locator.dart';
 import 'package:stockflow/core/sync/data/repos/sync_queue_repository_impl.dart';
 import 'package:stockflow/core/sync/domain/repositories/sync_queue_repository.dart';
+import 'package:stockflow/features/backup/cubit/export_cubit.dart';
+import 'package:stockflow/features/backup/data/backup_repository_impl.dart';
+import 'package:stockflow/features/backup/domain/backup_repository.dart';
+import 'package:stockflow/features/backup/domain/entities/exportable_source.dart';
+import 'package:stockflow/features/backup/domain/usecases/export_data_usecase.dart';
 import 'package:stockflow/main.dart';
 import 'package:stockflow/features/transactions/bloc/balance_cubit.dart';
 import 'package:stockflow/features/categories/bloc/category_totals_cubit.dart';
 import 'package:stockflow/features/transactions/bloc/transactions_bloc.dart';
+import 'package:stockflow/features/categories/data/repos/categories_export_source.dart';
 import 'package:stockflow/features/categories/data/repos/category_repository_impl.dart';
+import 'package:stockflow/features/transactions/data/repos/transactions_export_source.dart';
 import 'package:stockflow/features/transactions/data/repos/transactions_repository_impl.dart';
 import 'package:stockflow/features/transactions/data/transactions_data_source.dart';
 import 'package:stockflow/features/categories/domain/repositories/category_repository.dart';
@@ -79,6 +86,30 @@ void main() {
       () => CategoryTotalsCubit(
         watchCategoryTotals: getIt<WatchCategoryTotalsUsecase>(),
       ),
+    );
+    getIt.registerSingleton<ExportableSource>(
+      TransactionsExportSource(
+        transactionsRepository: getIt<TransactionsRepository>(),
+      ),
+      instanceName: 'transactionsExportSource',
+    );
+    getIt.registerSingleton<ExportableSource>(
+      CategoriesExportSource(categoryRepository: getIt<CategoryRepository>()),
+      instanceName: 'categoriesExportSource',
+    );
+    getIt.registerSingleton<BackupRepository>(
+      BackupRepositoryImpl(
+        sources: [
+          getIt<ExportableSource>(instanceName: 'transactionsExportSource'),
+          getIt<ExportableSource>(instanceName: 'categoriesExportSource'),
+        ],
+      ),
+    );
+    getIt.registerSingleton<ExportDataUseCase>(
+      ExportDataUseCase(getIt<BackupRepository>()),
+    );
+    getIt.registerFactory<ExportCubit>(
+      () => ExportCubit(exportDataUseCase: getIt<ExportDataUseCase>()),
     );
 
     addTearDown(() async {

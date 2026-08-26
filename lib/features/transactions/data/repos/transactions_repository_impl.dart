@@ -38,6 +38,12 @@ class TransactionsRepositoryImpl extends TransactionsRepository {
   }
 
   @override
+  Future<List<TransactionEntity>> getAllTransactionsOnce() async {
+    final rows = await dataSource.getAllTransactionsOnce();
+    return rows.map(_toEntity).toList();
+  }
+
+  @override
   Stream<int> watchBalance() {
     return dataSource.balance;
   }

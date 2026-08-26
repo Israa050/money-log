@@ -5,12 +5,19 @@ import 'package:stockflow/core/connectivity/domain/connectivity_repository.dart'
 import 'package:stockflow/core/connectivity/domain/usecases/watch_connectivity_usecase.dart';
 import 'package:stockflow/core/sync/data/repos/sync_queue_repository_impl.dart';
 import 'package:stockflow/core/sync/domain/repositories/sync_queue_repository.dart';
+import 'package:stockflow/features/backup/cubit/export_cubit.dart';
+import 'package:stockflow/features/backup/data/backup_repository_impl.dart';
+import 'package:stockflow/features/backup/domain/backup_repository.dart';
+import 'package:stockflow/features/backup/domain/entities/exportable_source.dart';
+import 'package:stockflow/features/backup/domain/usecases/export_data_usecase.dart';
 import 'package:stockflow/features/transactions/bloc/balance_cubit.dart';
 import 'package:stockflow/features/categories/bloc/categories_bloc.dart';
 import 'package:stockflow/features/categories/bloc/category_totals_cubit.dart';
 import 'package:stockflow/features/transactions/bloc/transactions_bloc.dart';
 import 'package:stockflow/features/transactions/data/connection.dart';
+import 'package:stockflow/features/categories/data/repos/categories_export_source.dart';
 import 'package:stockflow/features/categories/data/repos/category_repository_impl.dart';
+import 'package:stockflow/features/transactions/data/repos/transactions_export_source.dart';
 import 'package:stockflow/features/transactions/data/repos/transactions_repository_impl.dart';
 import 'package:stockflow/features/transactions/data/transactions_data_source.dart';
 import 'package:stockflow/features/categories/domain/repositories/category_repository.dart';
@@ -128,5 +135,35 @@ void setupServiceLocator() {
       updateCategoryUseCase: getIt<UpdateCategoryUseCase>(),
       deleteCategoryUseCase: getIt<DeleteCategoryUseCase>(),
     ),
+  );
+
+  getIt.registerLazySingleton<ExportableSource>(
+    () => TransactionsExportSource(
+      transactionsRepository: getIt<TransactionsRepository>(),
+    ),
+    instanceName: 'transactionsExportSource',
+  );
+
+  getIt.registerLazySingleton<ExportableSource>(
+    () =>
+        CategoriesExportSource(categoryRepository: getIt<CategoryRepository>()),
+    instanceName: 'categoriesExportSource',
+  );
+
+  getIt.registerLazySingleton<BackupRepository>(
+    () => BackupRepositoryImpl(
+      sources: [
+        getIt<ExportableSource>(instanceName: 'transactionsExportSource'),
+        getIt<ExportableSource>(instanceName: 'categoriesExportSource'),
+      ],
+    ),
+  );
+
+  getIt.registerLazySingleton<ExportDataUseCase>(
+    () => ExportDataUseCase(getIt<BackupRepository>()),
+  );
+
+  getIt.registerFactory<ExportCubit>(
+    () => ExportCubit(exportDataUseCase: getIt<ExportDataUseCase>()),
   );
 }

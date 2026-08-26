@@ -68,6 +68,16 @@ class TransactionsDataSource extends _$TransactionsDataSource {
         .watch();
   }
 
+  // One-shot read (vs. the .watch() stream above) -- used by the export/backup
+  // feature, which needs a single snapshot rather than a live subscription.
+  Future<List<Transaction>> getAllTransactionsOnce() {
+    return (select(transactions)..orderBy([
+          (t) =>
+              OrderingTerm(expression: t.occurredTime, mode: OrderingMode.desc),
+        ]))
+        .get();
+  }
+
   Future<int> addTransaction(TransactionsCompanion entry) {
     return into(transactions).insert(entry);
   }
@@ -93,6 +103,12 @@ class TransactionsDataSource extends _$TransactionsDataSource {
 
   Stream<List<Category>> get watchAllCategories {
     return select(categories).watch();
+  }
+
+  // One-shot read (vs. the .watch() stream above) -- used by the export/backup
+  // feature, which needs a single snapshot rather than a live subscription.
+  Future<List<Category>> getAllCategoriesOnce() {
+    return select(categories).get();
   }
 
   Future<int> addCategory(CategoriesCompanion entry) {
