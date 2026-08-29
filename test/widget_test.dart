@@ -1,7 +1,12 @@
 import 'package:drift/native.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:stockflow/core/connectivity/cubit/connectivity_cubit.dart';
+import 'package:stockflow/core/connectivity/domain/network_status.dart';
+import 'package:stockflow/core/connectivity/domain/usecases/watch_connectivity_usecase.dart';
 import 'package:stockflow/core/service_locator.dart';
+import 'package:stockflow/core/sync/cubit/pending_sync_cubit.dart';
+import 'package:stockflow/core/sync/domain/usecases/watch_pending_sync_count_usecase.dart';
 import 'package:stockflow/core/sync/data/repos/sync_queue_repository_impl.dart';
 import 'package:stockflow/core/sync/domain/repositories/sync_queue_repository.dart';
 import 'package:stockflow/features/backup/cubit/export_cubit.dart';
@@ -28,6 +33,21 @@ import 'package:stockflow/features/categories/domain/usecases/watch_categories_u
 import 'package:stockflow/features/categories/domain/usecases/watch_category_totals_usecase.dart';
 import 'package:stockflow/features/transactions/presentation/screens/transactions_screen.dart';
 
+/// Stub use case that never emits -- keeps [ConnectivityCubit] on its
+/// default online state without touching the connectivity_plus plugin.
+class _StubWatchConnectivityUseCase implements WatchConnectivityUseCase {
+  @override
+  Stream<NetworkStatus> call() => const Stream.empty();
+}
+
+/// Stub use case that never emits -- keeps [PendingSyncCubit] at 0 without
+/// wiring a real queue-count stream.
+class _StubWatchPendingSyncCountUseCase
+    implements WatchPendingSyncCountUseCase {
+  @override
+  Stream<int> call() => const Stream.empty();
+}
+
 void main() {
   testWidgets('App boots without throwing', (WidgetTester tester) async {
     // Registers against an in-memory Drift database instead of
@@ -36,6 +56,16 @@ void main() {
     // closed deterministically in tearDown below.
     final dataSource = TransactionsDataSource(NativeDatabase.memory());
     getIt.registerSingleton<TransactionsDataSource>(dataSource);
+    getIt.registerSingleton<ConnectivityCubit>(
+      ConnectivityCubit(
+        watchConnectivityUseCase: _StubWatchConnectivityUseCase(),
+      ),
+    );
+    getIt.registerSingleton<PendingSyncCubit>(
+      PendingSyncCubit(
+        watchPendingSyncCount: _StubWatchPendingSyncCountUseCase(),
+      ),
+    );
     getIt.registerSingleton<SyncQueueRepository>(
       SyncQueueRepositoryImpl(dataSource: dataSource),
     );

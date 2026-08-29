@@ -3,8 +3,10 @@ import 'package:stockflow/core/connectivity/cubit/connectivity_cubit.dart';
 import 'package:stockflow/core/connectivity/data/connectivity_repository_impl.dart';
 import 'package:stockflow/core/connectivity/domain/connectivity_repository.dart';
 import 'package:stockflow/core/connectivity/domain/usecases/watch_connectivity_usecase.dart';
+import 'package:stockflow/core/sync/cubit/pending_sync_cubit.dart';
 import 'package:stockflow/core/sync/data/repos/sync_queue_repository_impl.dart';
 import 'package:stockflow/core/sync/domain/repositories/sync_queue_repository.dart';
+import 'package:stockflow/core/sync/domain/usecases/watch_pending_sync_count_usecase.dart';
 import 'package:stockflow/features/backup/cubit/export_cubit.dart';
 import 'package:stockflow/features/backup/data/backup_repository_impl.dart';
 import 'package:stockflow/features/backup/domain/backup_repository.dart';
@@ -55,6 +57,17 @@ void setupServiceLocator() {
 
   getIt.registerLazySingleton<SyncQueueRepository>(
     () => SyncQueueRepositoryImpl(dataSource: getIt<TransactionsDataSource>()),
+  );
+
+  getIt.registerLazySingleton<WatchPendingSyncCountUseCase>(
+    () => WatchPendingSyncCountUseCase(getIt<SyncQueueRepository>()),
+  );
+
+  // App-wide singleton: one queue-count subscription for the whole app.
+  getIt.registerLazySingleton<PendingSyncCubit>(
+    () => PendingSyncCubit(
+      watchPendingSyncCount: getIt<WatchPendingSyncCountUseCase>(),
+    ),
   );
 
   getIt.registerLazySingleton<TransactionsRepository>(
