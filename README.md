@@ -64,6 +64,8 @@ delete with a countdown undo.
 - 🏷️ **Categories** — pick from four seeded default categories (Food, Transport, Shopping, Bills) when adding a transaction, shown as color-coded chips; the same colors carry through to the transaction list and the category totals card
 - 🗂️ **Manage categories** — a dedicated screen (opened from the transactions app bar) to create, rename/recolor, and delete categories from a fixed swatch palette; deleting a category that still has transactions orphans them into "Uncategorized" instead of failing, and every change propagates live to the add-transaction chips and transaction pills
 - 👉 **Swipe to delete** — swipe a row away, then **Undo** within a 5-second countdown before it's permanently deleted
+- 📡 **Offline banner** — a strip above the transaction list appears while the device has no network interface; the copy is informational ("changes are saved on this device"), since every write is persisted and queued locally regardless of connectivity
+- 🔼 **Pending-changes badge** — an app-bar badge showing how many local writes are waiting to sync (hidden at zero); backed by the sync-queue count stream
 - 🔄 **Fully reactive** — every screen is driven by a live Drift stream; add/delete never trigger a manual reload
 - 💾 **Local persistence** — everything is stored in an on-device SQLite database via Drift
 - 📤 **Export data** — an app-bar action serializes every transaction and category to a single JSON file (off the main isolate) and opens the OS share sheet, doubling as a manual backup for this offline-first app
@@ -108,16 +110,20 @@ flutter test
 Two complementary approaches are used:
 
 - **Drift-backed tests** (`database_test.dart`, `transactions_repository_test.dart`,
-  `category_repository_test.dart`, `transactions_bloc_test.dart`, `widget_test.dart`)
+  `category_repository_test.dart`, `transactions_bloc_test.dart`,
+  `sync/sync_queue_repository_impl_test.dart`, `widget_test.dart`)
   drive a real in-memory Drift database (`NativeDatabase.memory()`) instead of
   mocks, so no state leaks between tests and nothing touches disk.
-- **Mocktail-backed bloc/cubit tests** (`transactions_bloc_mocktail_test.dart`,
-  `categories_bloc_mocktail_test.dart`, `balance_cubit_mocktail_test.dart`)
+- **Mocktail-backed bloc/cubit/use-case tests** (`transactions_bloc_mocktail_test.dart`,
+  `categories_bloc_mocktail_test.dart`, `balance_cubit_mocktail_test.dart`,
+  `connectivity/`, `sync/watch_pending_sync_count_usecase_test.dart`)
   use [`bloc_test`](https://pub.dev/packages/bloc_test) and
   [`mocktail`](https://pub.dev/packages/mocktail) with mocked use cases
   ([`test/helpers/mocks.dart`](test/helpers/mocks.dart)) to assert state
   emissions in isolation, including failure paths a real repository can't be
   forced into (see below).
+- **Pure-function tests** (`format_test.dart`,
+  `backup/export_serializer_test.dart`) need neither a database nor mocks.
 
 ### Continuous integration
 
@@ -157,8 +163,11 @@ lib/
 │   │   │       └── watch_connectivity_usecase.dart
 │   │   ├── data/
 │   │   │   └── connectivity_repository_impl.dart # Wraps connectivity_plus; maps ConnectivityResult -> NetworkStatus
-│   │   └── cubit/
-│   │       └── connectivity_cubit.dart      # Broadcasts NetworkStatus app-wide; registered as a singleton
+│   │   ├── cubit/
+│   │   │   └── connectivity_cubit.dart      # Broadcasts NetworkStatus app-wide; registered as a singleton
+│   │   └── presentation/
+│   │       └── widgets/
+│   │           └── offline_banner.dart      # Strip shown above screen content while offline; driven by ConnectivityCubit
 │   ├── sync/                      # Offline outbox layer (not a feature — see below)
 │   │   ├── domain/
 │   │   │   ├── entities/
@@ -168,11 +177,16 @@ lib/
 │   │   │   │   └── sync_queue_repository.dart   # Abstract interface — enqueue(...), watchPendingCount()
 │   │   │   └── usecases/
 │   │   │       └── watch_pending_sync_count_usecase.dart
-│   │   └── data/
-│   │       ├── models/
-│   │       │   └── sync_queue_entries.dart      # Drift table definition — id, entityType, entityId, operation, payload, createdAt
-│   │       └── repos/
-│   │           └── sync_queue_repository_impl.dart # Implements SyncQueueRepository against TransactionsDataSource
+│   │   ├── data/
+│   │   │   ├── models/
+│   │   │   │   └── sync_queue_entries.dart      # Drift table definition — id, entityType, entityId, operation, payload, createdAt
+│   │   │   └── repos/
+│   │   │       └── sync_queue_repository_impl.dart # Implements SyncQueueRepository against TransactionsDataSource
+│   │   ├── cubit/
+│   │   │   └── pending_sync_cubit.dart          # Broadcasts the queue-count stream (Cubit<int>); registered as a singleton
+│   │   └── presentation/
+│   │       └── widgets/
+│   │           └── pending_sync_badge.dart      # App-bar badge over PendingSyncCubit; hidden at zero
 │   └── theme/
 │       ├── app_colors.dart        # Semantic color tokens (light/dark) as a ThemeExtension
 │       └── app_theme.dart         # Builds ThemeData (app bar, cards, inputs, FAB...) from the tokens
@@ -443,7 +457,10 @@ transaction, so a separate background process can drain the outbox and
 publish those events (here, to Supabase) without ever risking the data
 change and the sync record disagreeing about what happened. The actual
 background drain/push-to-Supabase process is not built yet — only the write
-side (the outbox itself) exists so far.
+side (the outbox itself) exists so far. The design rationale below is also
+captured, in shorter form, in
+[`docs/sync-queue.md`](docs/sync-queue.md) — the canonical reference for
+why "always enqueue" was chosen and what is deliberately deferred.
 
 - **Every write always enqueues, online or offline.** There is exactly one
   code path for every write: local DB write, then enqueue — never a
@@ -863,8 +880,13 @@ above).
     `NetworkStatus` — registered as a `getIt.registerLazySingleton`, not
     `registerFactory` like the feature blocs/cubits, since it's meant to be
     one shared app-wide instance rather than a fresh one per screen.
-  - Not yet consumed anywhere in the UI (no `BlocProvider`, no offline
-    banner) — see [Not yet done](#-not-yet-done).
+  - Consumed by `OfflineBanner`
+    (`lib/core/connectivity/presentation/widgets/offline_banner.dart`): a
+    `BlocBuilder<ConnectivityCubit, NetworkStatus>` rendering a thin strip
+    above the transaction list while offline, collapsed (`AnimatedSize`) when
+    online. `ConnectivityCubit` is provided app-wide via `BlocProvider.value`
+    in `main.dart` (`.value`, not `create`, since it's a singleton the
+    provider must not close).
 - **Offline sync queue / transactional outbox (new):** a core, cross-cutting
   layer under `lib/core/sync/` recording every write to `Transactions` and
   `Categories` so it can be pushed to Supabase later — see
@@ -887,9 +909,15 @@ above).
     not a returned value) and re-caught just outside to restore the
     `Result<T>` contract callers expect.
   - `WatchPendingSyncCountUseCase` wraps `watchPendingCount()` the same way
-    `WatchBalanceUseCase` wraps `watchBalance()` — not yet registered in
-    `service_locator.dart` or consumed by any bloc/UI, since nothing
-    displays a pending-sync count yet.
+    `WatchBalanceUseCase` wraps `watchBalance()`. It is now registered in
+    `service_locator.dart` and consumed by `PendingSyncCubit` (a
+    `Cubit<int>` shaped like `BalanceCubit`), which `PendingSyncBadge`
+    (`lib/core/sync/presentation/widgets/pending_sync_badge.dart`) renders as
+    an app-bar badge — hidden when the count is zero. Because no drain
+    process exists, the count only ever grows, so the badge's tooltip says
+    "N changes waiting to sync", never "failed". `PendingSyncCubit` is
+    provided app-wide via `BlocProvider.value` in `main.dart`, same as
+    `ConnectivityCubit`.
   - **Not yet built:** the actual background process that drains
     `SyncQueueEntries` and pushes to Supabase, and a `synced`/status column
     to distinguish drained rows from pending ones — every row currently
@@ -932,8 +960,15 @@ above).
     (transactions and categories) with no guaranteed ordering, its "empty
     table" test asserts on the settled state rather than a single expected
     emission.
+  - `test/sync/sync_queue_repository_impl_test.dart` (new) —
+    `SyncQueueRepositoryImpl` against a real Drift database: `enqueue`
+    generates `id`/`createdAt` internally, stores `entityType`/`entityId`/
+    `payload` verbatim, round-trips `operation` as the `OperationType` enum,
+    and `watchPendingCount()` emits `0` when empty, `N` after N enqueues, is
+    reactive, and counts rows regardless of operation type.
   - `test/widget_test.dart` — boots the full widget tree against an
-    in-memory database with proper teardown.
+    in-memory database with proper teardown; registers stub use cases for
+    `ConnectivityCubit` and `PendingSyncCubit`.
 - Mocktail-backed bloc/cubit unit tests, mocking the use cases each bloc
   actually depends on (`test/helpers/mocks.dart`) rather than the
   repository, so each test isolates exactly at the bloc's real dependency
@@ -961,6 +996,22 @@ above).
     `WatchBalanceUseCase`: initial state is `0` before the stream emits, a
     single stream value is re-emitted as-is, and multiple stream values are
     emitted in order.
+  - `test/connectivity/` (new) — `ConnectivityRepositoryImpl` against a
+    mocked `Connectivity`: the online/offline mapping rule (`[none]` →
+    offline, `[]` → offline, `[wifi]` → online, `[none, mobile]` →
+    **online**, all-`none` → offline), stream mapping, and the plugin-throws
+    → `Failure` path; `ConnectivityCubit` (seed state `online`, ordered
+    emissions, `close()` cancels the subscription); `WatchConnectivityUseCase`
+    passthrough.
+  - `test/sync/watch_pending_sync_count_usecase_test.dart` (new) — passthrough
+    to `SyncQueueRepository.watchPendingCount()`.
+- **Connectivity & offline sync UI (new):** `OfflineBanner` and
+  `PendingSyncBadge`/`PendingSyncCubit` wired into `main.dart` +
+  `transactions_screen.dart` — see
+  [Connectivity layer](#-whats-implemented) and
+  [Offline sync queue](#offline-sync-queue-transactional-outbox) above, and
+  the consolidated [release note](#unreleased--connectivity--offline-sync-queue).
+  Widget/cubit tests for these three still pending.
 - **Export data (new):** a new `lib/features/backup/` feature — see
   [Export data](#export-data-manual-backup) above for the full design
   writeup (the `ExportableSource`/OCP seam, the isolate boundary, the
@@ -994,9 +1045,11 @@ above).
     tapping the button in the running app does nothing yet. Re-enabling it
     is a one-line change once the remaining checklist items below are
     ready.
-  - **No dedicated tests yet** for the serializer, `BackupRepositoryImpl`,
-    or `ExportCubit` — `test/widget_test.dart` was updated only far enough
-    to register the new DI graph so the app still boots in tests.
+  - `test/backup/export_serializer_test.dart` covers `buildEnvelope` /
+    `encodeExport` (metadata, UTC `exportedAt`, `counts`, JSON round-trip).
+    `BackupRepositoryImpl` and `ExportCubit` still have no dedicated tests —
+    `test/widget_test.dart` was updated only far enough to register the DI
+    graph so the app still boots in tests.
 
 ## 🚧 Not yet done
 
@@ -1004,14 +1057,14 @@ above).
 - No filtering/search/date-range views over the transaction list.
 - No protection against deleting all categories at once, beyond the add
   sheet and category list both handling an empty category set gracefully.
-- `ConnectivityCubit` exists and is registered in `get_it`, but nothing in
-  the widget tree provides or listens to it yet — no offline banner, no
-  action gated on network state.
+- The offline banner reflects network *interface* state, not reachability
+  (that's all `connectivity_plus` reports) — no captive-portal/dead-Wi-Fi
+  detection, and no action is gated on network state.
 - The sync queue (`SyncQueueEntries`) only has a write side. There is no
-  background process draining it and pushing to Supabase, no `synced`/status
-  column to tell a drained row from a pending one (every row currently
-  counts as pending), and `WatchPendingSyncCountUseCase` isn't wired into
-  `service_locator.dart` or shown anywhere in the UI yet.
+  background process draining it and pushing to Supabase, and no
+  `synced`/status column to tell a drained row from a pending one — so the
+  pending-changes badge count only ever grows (it's "changes recorded on
+  this device", not "sync failures").
 - Only `Transactions` and `Categories` writes enqueue to the sync queue —
   there is no actual Supabase client/project wired up anywhere in the app
   yet, so "sync" today means "durably recorded locally," not "reached the
@@ -1025,16 +1078,39 @@ above).
 
 ## 🏷️ Release notes
 
-### Unreleased — Offline sync queue (outbox)
+### Unreleased — Connectivity & offline sync queue
+
+Groups the connectivity layer, the transactional-outbox sync queue, and the
+two UI affordances they drive (offline banner, pending-changes badge). Cut a
+tag from these notes when this ships.
+
+**Connectivity layer**
+
+- Added `connectivity_plus` and a core, cross-cutting connectivity layer
+  under `lib/core/connectivity/` (`ConnectivityRepository`/Impl,
+  `WatchConnectivityUseCase`, `ConnectivityCubit`), all registered as
+  `get_it` lazy singletons. Placed in `core/`, not as its own feature or
+  inside `transactions/`, since network status is infrastructure any
+  feature may depend on, not a business concern.
+- The domain layer exposes a `NetworkStatus` enum instead of the plugin's
+  `ConnectivityResult`, and treats "offline" as a normal
+  `Success(NetworkStatus.offline)` rather than a `Result.failure` — `Failure`
+  is reserved for actual connectivity-check errors.
+- `_toNetworkStatus` maps the plugin's `List<ConnectivityResult>` with an
+  "every result is `none`" rule (not "contains `none`"), so a single active
+  interface among several inactive ones still reads as online.
+
+**Offline sync queue (transactional outbox)**
 
 - Added `lib/core/sync/`: a `SyncQueueEntries` Drift table (schema v4) plus
   `OperationType`, `SyncQueueRepository`/`Impl`, and
   `WatchPendingSyncCountUseCase` — the write side of a transactional
   outbox for later Supabase sync. See
-  [Offline sync queue](#offline-sync-queue-transactional-outbox) for the
-  full design writeup (always-enqueue over connectivity-branching, atomic
-  transaction + enqueue, snapshot-vs-pointer payload).
-- `TransactionsRepositoryImpl` and `CategoryRepositoryImpl` now wrap every
+  [Offline sync queue](#offline-sync-queue-transactional-outbox) and
+  [`docs/sync-queue.md`](docs/sync-queue.md) for the full design writeup
+  (always-enqueue over connectivity-branching, atomic transaction + enqueue,
+  snapshot-vs-pointer payload).
+- `TransactionsRepositoryImpl` and `CategoryRepositoryImpl` wrap every
   write (`add`/`update`/`delete`) in a Drift `transaction()` alongside a
   `syncQueueRepository.enqueue(...)` call, so a transaction/category row and
   its sync-queue record either both commit or neither does.
@@ -1047,23 +1123,47 @@ above).
   Drift's transaction/FK guarantees require every table sharing them to be
   in one `@DriftDatabase` class — only the table *definition files* and the
   surrounding CRUD/bloc/UI code moved.
-- Background drain-to-Supabase process not built yet — see
-  [Not yet done](#-not-yet-done).
 
-### Unreleased — Connectivity layer
+**UI**
 
-- Added `connectivity_plus` and a core, cross-cutting connectivity layer
-  under `lib/core/connectivity/` (`ConnectivityRepository`/Impl,
-  `WatchConnectivityUseCase`, `ConnectivityCubit`), all registered as
-  `get_it` lazy singletons. Placed in `core/`, not as its own feature or
-  inside `transactions/`, since network status is infrastructure any
-  feature may depend on, not a business concern.
-- The domain layer exposes a `NetworkStatus` enum instead of the plugin's
-  `ConnectivityResult`, and treats "offline" as a normal
-  `Success(NetworkStatus.offline)` rather than a `Result.failure` — `Failure`
-  is reserved for actual connectivity-check errors.
-- Not yet wired into the UI — no `BlocProvider` for `ConnectivityCubit`, no
-  offline banner or gated actions yet.
+- `OfflineBanner` (`lib/core/connectivity/presentation/widgets/`) — a strip
+  above the transaction list driven by `ConnectivityCubit`, shown while
+  offline, collapsed (`AnimatedSize`) when online. Copy is informational
+  ("changes are saved on this device"), not an error state.
+- `PendingSyncCubit` (`lib/core/sync/cubit/`, a `Cubit<int>` over
+  `watchPendingSyncCount()`) and `PendingSyncBadge`
+  (`lib/core/sync/presentation/widgets/`) — an app-bar badge showing the
+  queue count, hidden at zero. `WatchPendingSyncCountUseCase` and
+  `PendingSyncCubit` are now registered in `service_locator.dart` (they
+  existed but were unwired). Both cubits are provided app-wide via
+  `BlocProvider.value` in `main.dart`.
+- `transactions_screen.dart` body logic extracted to a private
+  `_TransactionsBody` widget so the banner can sit outside the `BlocBuilder`
+  (visible even during the initial loading spinner).
+
+**Tests**
+
+- `test/connectivity/` — `ConnectivityRepositoryImpl` (the mapping rule +
+  the `checkConnectivity` error path + stream mapping), `ConnectivityCubit`
+  (seed state, ordered emissions, `close()` cancels the subscription),
+  `WatchConnectivityUseCase` passthrough.
+- `test/sync/` — `SyncQueueRepositoryImpl` against a real in-memory Drift DB
+  (`enqueue` id/`createdAt` generation, verbatim payload storage, operation
+  enum round-trip, reactive `watchPendingCount`), `WatchPendingSyncCountUseCase`
+  passthrough.
+- `test/backup/export_serializer_test.dart` — `buildEnvelope`/`encodeExport`
+  (fixed metadata, UTC `exportedAt`, `counts` derivation, JSON round-trip).
+- `test/widget_test.dart` registers stub use cases for the two new cubits so
+  `MyApp` still boots.
+- Widget/cubit tests for `OfflineBanner`, `PendingSyncCubit`, and
+  `PendingSyncBadge` are still pending — see [Not yet done](#-not-yet-done).
+
+**Not built yet**
+
+- The background process that drains `SyncQueueEntries` and pushes to
+  Supabase; a `synced`/status column (so the pending count only grows for
+  now); no Supabase client/project exists yet, so "sync" means "durably
+  recorded locally". See [Not yet done](#-not-yet-done).
 
 ### v0.4.0 — Manage categories
 
