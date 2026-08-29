@@ -1,4 +1,8 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:stockflow/core/connectivity/domain/connectivity_repository.dart';
+import 'package:stockflow/core/connectivity/domain/usecases/watch_connectivity_usecase.dart';
+import 'package:stockflow/core/sync/domain/repositories/sync_queue_repository.dart';
 import 'package:stockflow/features/categories/domain/repositories/category_repository.dart';
 import 'package:stockflow/features/transactions/domain/repositories/transactions_repository.dart';
 import 'package:stockflow/features/categories/domain/usecases/add_category_usecase.dart';
@@ -33,3 +37,15 @@ class MockUpdateCategoryUseCase extends Mock implements UpdateCategoryUseCase {}
 class MockDeleteCategoryUseCase extends Mock implements DeleteCategoryUseCase {}
 
 class MockWatchBalanceUseCase extends Mock implements WatchBalanceUseCase {}
+
+class MockConnectivityRepository extends Mock
+    implements ConnectivityRepository {}
+
+/// The `connectivity_plus` plugin class -- mocked so
+/// [ConnectivityRepositoryImpl] can be unit-tested without a platform channel.
+class MockConnectivity extends Mock implements Connectivity {}
+
+class MockWatchConnectivityUseCase extends Mock
+    implements WatchConnectivityUseCase {}
+
+class MockSyncQueueRepository extends Mock implements SyncQueueRepository {}
