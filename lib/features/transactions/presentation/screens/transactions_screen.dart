@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:stockflow/core/connectivity/presentation/widgets/offline_banner.dart';
+import 'package:stockflow/core/sync/presentation/widgets/pending_sync_badge.dart';
 import 'package:stockflow/features/backup/presentation/widgets/export_action.dart';
 import 'package:stockflow/features/transactions/bloc/transactions_bloc.dart';
 import 'package:stockflow/features/categories/domain/entities/category_entity.dart';
@@ -66,9 +68,14 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         .then((_) {
           if (undone) return;
           bloc.add(DeleteTransactionEvent(id: transaction.id));
-          // _pendingDeleteIds is pruned in build() once the bloc confirms
-          // the row is actually gone, so it never grows unbounded.
+          // _pendingDeleteIds is pruned via onConfirmedGone once the bloc
+          // confirms the row is actually gone, so it never grows unbounded.
         });
+  }
+
+  void _handleConfirmedGone(List<String> ids) {
+    if (!mounted) return;
+    setState(() => _pendingDeleteIds.removeAll(ids));
   }
 
   @override
@@ -77,6 +84,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       appBar: AppBar(
         title: const Text('Transactions'),
         actions: [
+          const PendingSyncBadge(),
           const ExportAction(),
           IconButton(
             icon: const Icon(Icons.label_outline),
@@ -87,77 +95,108 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           ),
         ],
       ),
-      body: BlocBuilder<TransactionsBloc, TransactionsState>(
-        builder: (context, state) {
-          final allData = switch (state) {
-            TransactionsInitial() => null,
-            Loaded(:final data) => data,
-            TransactionsError(:final previousData) => previousData,
-          };
-          final categories = switch (state) {
-            Loaded(:final categories) => categories,
-            _ => const <CategoryEntity>[],
-          };
-
-          if (state is TransactionsError) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text(state.message)));
-            });
-          }
-
-          if (allData == null) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (state is Loaded && _pendingDeleteIds.isNotEmpty) {
-            final stillPresent = allData.map((t) => t.id).toSet();
-            final confirmedGone = _pendingDeleteIds
-                .where((id) => !stillPresent.contains(id))
-                .toList();
-            if (confirmedGone.isNotEmpty) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (!mounted) return;
-                setState(() => _pendingDeleteIds.removeAll(confirmedGone));
-              });
-            }
-          }
-
-          final data = _pendingDeleteIds.isEmpty
-              ? allData
-              : allData
-                    .where((t) => !_pendingDeleteIds.contains(t.id))
-                    .toList();
-
-          final income = data
-              .where((t) => t.type == TransactionType.income)
-              .fold<int>(0, (sum, t) => sum + t.amountMinor);
-          final expense = data
-              .where((t) => t.type == TransactionType.expense)
-              .fold<int>(0, (sum, t) => sum + t.amountMinor);
-
-          return Column(
-            children: [
-              BalanceSummaryCard(income: income, expense: expense),
-              const CategoryTotalsCard(),
-              Expanded(
-                child: TransactionsList(
-                  data: data,
-                  onDelete: _handleSwipeToDelete,
-                  categories: categories,
-                ),
-              ),
-            ],
-          );
-        },
+      body: Column(
+        children: [
+          const OfflineBanner(),
+          Expanded(
+            child: _TransactionsBody(
+              pendingDeleteIds: _pendingDeleteIds,
+              onDelete: _handleSwipeToDelete,
+              onConfirmedGone: _handleConfirmedGone,
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showAddTransactionSheet(context),
         icon: const Icon(Icons.add),
         label: const Text('Add'),
       ),
+    );
+  }
+}
+
+class _TransactionsBody extends StatelessWidget {
+  const _TransactionsBody({
+    required this.pendingDeleteIds,
+    required this.onDelete,
+    required this.onConfirmedGone,
+  });
+
+  /// Ids the parent is hiding locally while their delete is still undoable.
+  final Set<String> pendingDeleteIds;
+
+  /// Called when the user swipes a row away.
+  final void Function(TransactionEntity transaction) onDelete;
+
+  /// Called with the ids that the bloc has now confirmed are gone, so the
+  /// parent can drop them from [pendingDeleteIds].
+  final void Function(List<String> ids) onConfirmedGone;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<TransactionsBloc, TransactionsState>(
+      builder: (context, state) {
+        final allData = switch (state) {
+          TransactionsInitial() => null,
+          Loaded(:final data) => data,
+          TransactionsError(:final previousData) => previousData,
+        };
+        final categories = switch (state) {
+          Loaded(:final categories) => categories,
+          _ => const <CategoryEntity>[],
+        };
+
+        if (state is TransactionsError) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(state.message)));
+          });
+        }
+
+        if (allData == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (state is Loaded && pendingDeleteIds.isNotEmpty) {
+          final stillPresent = allData.map((t) => t.id).toSet();
+          final confirmedGone = pendingDeleteIds
+              .where((id) => !stillPresent.contains(id))
+              .toList();
+          if (confirmedGone.isNotEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => onConfirmedGone(confirmedGone),
+            );
+          }
+        }
+
+        final data = pendingDeleteIds.isEmpty
+            ? allData
+            : allData.where((t) => !pendingDeleteIds.contains(t.id)).toList();
+
+        final income = data
+            .where((t) => t.type == TransactionType.income)
+            .fold<int>(0, (sum, t) => sum + t.amountMinor);
+        final expense = data
+            .where((t) => t.type == TransactionType.expense)
+            .fold<int>(0, (sum, t) => sum + t.amountMinor);
+
+        return Column(
+          children: [
+            BalanceSummaryCard(income: income, expense: expense),
+            const CategoryTotalsCard(),
+            Expanded(
+              child: TransactionsList(
+                data: data,
+                onDelete: onDelete,
+                categories: categories,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

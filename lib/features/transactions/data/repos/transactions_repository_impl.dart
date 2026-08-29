@@ -73,6 +73,10 @@ class TransactionsRepositoryImpl extends TransactionsRepository {
     });
 
     try {
+      // The local write and its sync-queue row share one transaction, and the
+      // row is enqueued unconditionally -- online or offline. See
+      // docs/sync-queue.md for why "always enqueue" is the right call and what
+      // is deliberately not built yet.
       await dataSource.transaction(() async {
         await dataSource.addTransaction(entry);
         final queued = await syncQueueRepository.enqueue(
