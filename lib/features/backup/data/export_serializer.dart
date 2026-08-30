@@ -5,7 +5,7 @@ Map<String, Object?> buildEnvelope(
 ) {
   return {
     'formatVersion': 1,
-    'appVersion': '0.4.0',
+    'appVersion': '0.5.0',
     'exportedAt': DateTime.now().toUtc().toIso8601String(),
     'schemaVersion': 4,
     'counts': sourceData.map((key, rows) => MapEntry(key, rows.length)),

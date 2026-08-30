@@ -20,7 +20,7 @@ void main() {
       final envelope = buildEnvelope(sampleData);
 
       expect(envelope['formatVersion'], 1);
-      expect(envelope['appVersion'], '0.4.0');
+      expect(envelope['appVersion'], '0.5.0');
       expect(envelope['schemaVersion'], 4);
     });
 
@@ -94,7 +94,7 @@ void main() {
           jsonDecode(encodeExport(sampleData)) as Map<String, Object?>;
 
       expect(decoded['formatVersion'], 1);
-      expect(decoded['appVersion'], '0.4.0');
+      expect(decoded['appVersion'], '0.5.0');
       expect(decoded['schemaVersion'], 4);
       expect(decoded['counts'], {'transactions': 2, 'categories': 1});
       expect(decoded['transactions'], sampleData['transactions']);

@@ -3,6 +3,37 @@
 Notes for each build pushed to `production`. The top entry is what
 Firebase App Distribution shows testers for the current release.
 
+## v0.5.0 — Offline banner & sync queue
+
+- Added a **connectivity layer** (`lib/core/connectivity/`): wraps
+  `connectivity_plus` behind a `ConnectivityRepository` that maps the
+  plugin's results down to a domain `NetworkStatus` enum, with an
+  `ConnectivityCubit` broadcasting it app-wide. "Offline" is a normal
+  `Success(NetworkStatus.offline)`, not an error; `Failure` is reserved for
+  real connectivity-check errors.
+- Added a **transactional outbox** (`lib/core/sync/`): every write to
+  `Transactions` or `Categories` now also records a row in a new
+  `SyncQueueEntries` Drift table (schema v4), in the *same* Drift
+  `transaction()` as the write itself — so the change and its sync record
+  either both commit or neither does. Every write always enqueues,
+  regardless of connectivity; see `docs/sync-queue.md` for why. The
+  background process that drains the queue to a server is not built yet.
+- Added an **offline banner**: a strip above the transaction list, shown
+  while the device has no network interface. The copy is informational
+  ("changes are saved on this device"), not an error.
+- Added a **pending-changes badge**: an app-bar badge showing how many
+  local writes are waiting to sync (hidden at zero), backed by the
+  sync-queue count stream. The count only grows for now (no drain process),
+  so it reads as "changes recorded on this device", not "sync failures".
+- Reorganized the codebase from a single `lib/transactions/` folder into
+  `lib/features/{transactions,categories}/` plus
+  `lib/core/{connectivity,sync,theme}/`.
+- Added test suites for the connectivity layer (repository mapping rule +
+  error path, cubit lifecycle, use case), the sync queue
+  (`SyncQueueRepositoryImpl` against a real in-memory Drift database, use
+  case passthrough), and the export serializer (`buildEnvelope` /
+  `encodeExport`).
+
 ## v0.4.0 — Manage categories
 
 - Categories are now a fully editable resource: a new "Manage Categories"
