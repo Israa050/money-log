@@ -1,11 +1,16 @@
 import 'package:get_it/get_it.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:stockflow/core/connectivity/cubit/connectivity_cubit.dart';
 import 'package:stockflow/core/connectivity/data/connectivity_repository_impl.dart';
 import 'package:stockflow/core/connectivity/domain/connectivity_repository.dart';
 import 'package:stockflow/core/connectivity/domain/usecases/watch_connectivity_usecase.dart';
 import 'package:stockflow/core/sync/cubit/pending_sync_cubit.dart';
+import 'package:stockflow/core/sync/data/datasources/supabase_sync_data_source.dart';
 import 'package:stockflow/core/sync/data/repos/sync_queue_repository_impl.dart';
+import 'package:stockflow/core/sync/data/repos/sync_repository_impl.dart';
 import 'package:stockflow/core/sync/domain/repositories/sync_queue_repository.dart';
+import 'package:stockflow/core/sync/domain/repositories/sync_repository.dart';
+import 'package:stockflow/core/sync/domain/usecases/push_pending_changes_usecase.dart';
 import 'package:stockflow/core/sync/domain/usecases/watch_pending_sync_count_usecase.dart';
 import 'package:stockflow/features/backup/cubit/export_cubit.dart';
 import 'package:stockflow/features/backup/data/backup_repository_impl.dart';
@@ -37,6 +42,9 @@ import 'package:stockflow/features/categories/domain/usecases/watch_category_tot
 final getIt = GetIt.instance;
 
 void setupServiceLocator() {
+  // Requires Supabase.initialize() to have already completed in main().
+  getIt.registerLazySingleton<SupabaseClient>(() => Supabase.instance.client);
+
   getIt.registerLazySingleton<ConnectivityRepository>(
     () => ConnectivityRepositoryImpl(),
   );
@@ -61,6 +69,21 @@ void setupServiceLocator() {
 
   getIt.registerLazySingleton<WatchPendingSyncCountUseCase>(
     () => WatchPendingSyncCountUseCase(getIt<SyncQueueRepository>()),
+  );
+
+  getIt.registerLazySingleton<SupabaseSyncDataSource>(
+    () => SupabaseSyncDataSource(client: getIt<SupabaseClient>()),
+  );
+
+  getIt.registerLazySingleton<SyncRepository>(
+    () => SyncRepositoryImpl(
+      syncQueueRepository: getIt<SyncQueueRepository>(),
+      supabaseSyncDataSource: getIt<SupabaseSyncDataSource>(),
+    ),
+  );
+
+  getIt.registerLazySingleton<PushPendingChangesUseCase>(
+    () => PushPendingChangesUseCase(getIt<SyncRepository>()),
   );
 
   // App-wide singleton: one queue-count subscription for the whole app.
