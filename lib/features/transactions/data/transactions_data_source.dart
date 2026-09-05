@@ -174,6 +174,14 @@ class TransactionsDataSource extends _$TransactionsDataSource {
     final query = selectOnly(syncQueueEntries)..addColumns([count]);
     return query.watchSingle().map((row) => row.read(count) ?? 0);
   }
+
+  Future<List<SyncQueueEntry>> getAllSyncQueueEntries() {
+    return select(syncQueueEntries).get();
+  }
+
+  Future<int> deleteSyncQueueEntry(String id) {
+    return (delete(syncQueueEntries)..where((item) => item.id.equals(id))).go();
+  }
 }
 
 class CategoryTotalRow {
