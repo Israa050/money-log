@@ -44,15 +44,9 @@ class SupabaseSyncDataSource {
   /// from before a remote schema change still push correctly after an app
   /// update changes this mapping.
   ///
-  /// Exposed via `@visibleForTesting` -- calling this directly is the only
-  /// practical way to test this mapping, since mocking the Supabase SDK's
-  /// `client.from(...).upsert(...)` chain hits a fundamental limitation:
-  /// its awaitability comes from an overridden generic `then` method,
-  /// which mocktail cannot reliably intercept (confirmed by two separate
-  /// mock attempts, both failing with a "type 'Null' is not a subtype of
-  /// type `Future<dynamic>`" error even with the correct named-parameter
-  /// matcher). Testing the mapping directly avoids depending on SDK
-  /// internals mocktail can't safely fake.
+  /// `@visibleForTesting`: mocktail can't reliably intercept Supabase's
+  /// `client.from(...).upsert(...)` chain (its awaitability comes from an
+  /// overridden generic `then`), so this mapping is tested directly instead.
   @visibleForTesting
   Map<String, dynamic> mapForSupabase(
     String entityType,

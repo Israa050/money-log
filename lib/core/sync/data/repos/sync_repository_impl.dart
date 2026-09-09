@@ -29,18 +29,14 @@ class SyncRepositoryImpl implements SyncRepository {
       try {
         await supabaseSyncDataSource.pushEntry(entry);
       } catch (e, st) {
-        // Push failed (network, server rejection, etc.) -- leave this entry
-        // queued and move on to the next one. No error/retry bookkeeping;
-        // it'll simply be retried on the next pushPending() call. Logged
-        // (not swallowed silently) so a persistent failure -- e.g. a schema
-        // or RLS mismatch that will never succeed on retry -- is visible.
-        // .toString() here, not .name -- a confirmed Dart tooling edge case
-        // makes .name throw NoSuchMethodError specifically in this
-        // catch-after-a-Result-pattern-match-and-loop shape (isolated and
-        // reproduced independently of this file's actual types; .toString()
-        // does not trigger it). Produces "OperationType.create" instead of
-        // "create" in the log -- functionally identical, just the enum's
-        // qualified name.
+        // Push failed -- leave this entry queued and move on. No
+        // error/retry bookkeeping; it's simply retried next pushPending().
+        // Logged (not swallowed) so a persistent failure stays visible.
+        //
+        // .toString() not .name: a reproduced Dart/mocktail edge case makes
+        // .name throw NoSuchMethodError in this exact catch-after-loop
+        // shape. .toString() gives "OperationType.create" instead of
+        // "create" -- same info, just qualified.
         _logger.w(
           'Sync push failed for ${entry.entityType}/${entry.id} '
           '(${entry.operation.toString()}): $e',
