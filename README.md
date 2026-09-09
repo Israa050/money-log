@@ -66,6 +66,7 @@ delete with a countdown undo.
 - 👉 **Swipe to delete** — swipe a row away, then **Undo** within a 5-second countdown before it's permanently deleted
 - 📡 **Offline banner** — a strip above the transaction list appears while the device has no network interface; the copy is informational ("changes are saved on this device"), since every write is persisted and queued locally regardless of connectivity
 - 🔼 **Pending-changes badge** — an app-bar badge showing how many local writes are waiting to sync (hidden at zero); backed by the sync-queue count stream
+- ☁️ **Push sync to Supabase** — queued local writes are pushed to a Supabase backend (anonymous auth, RLS scoped to `auth.uid()`) whenever connectivity comes back online or a new change is queued while already online; each row pushes independently and failed rows simply stay queued for the next retry — no status/retry-count bookkeeping needed, since upsert/delete are idempotent
 - 🔄 **Fully reactive** — every screen is driven by a live Drift stream; add/delete never trigger a manual reload
 - 💾 **Local persistence** — everything is stored in an on-device SQLite database via Drift
 - 📤 **Export data** — an app-bar action serializes every transaction and category to a single JSON file (off the main isolate) and opens the OS share sheet, doubling as a manual backup for this offline-first app
@@ -81,6 +82,7 @@ delete with a countdown undo.
 | Persistence    | [drift](https://pub.dev/packages/drift) (SQLite)               |
 | DI             | [get_it](https://pub.dev/packages/get_it)                     |
 | Connectivity   | [connectivity_plus](https://pub.dev/packages/connectivity_plus) |
+| Backend        | [supabase_flutter](https://pub.dev/packages/supabase_flutter) (Postgres + auth + RLS) |
 | Sharing        | [share_plus](https://pub.dev/packages/share_plus) (export file → OS share sheet) |
 | IDs            | [uuid](https://pub.dev/packages/uuid) (client-generated v4)   |
 | Logging        | [logger](https://pub.dev/packages/logger)                     |
@@ -93,8 +95,14 @@ delete with a countdown undo.
 ```bash
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs
-flutter run
+cp env.example.json env.json   # fill in your own Supabase URL + anon key
+flutter run --dart-define-from-file=env.json
 ```
+
+> `env.json` is gitignored — it holds real Supabase credentials and is never
+> committed. The app throws a clear `StateError` at startup if it's missing.
+> A VS Code launch config that passes the flag automatically is provided in
+> [`.vscode/launch.json`](.vscode/launch.json) (pick "stockflow (env)").
 
 > The `build_runner` step regenerates Drift's `*.g.dart` files. Re-run it
 > whenever a table definition under `lib/features/transactions/data/models/`,
@@ -116,12 +124,20 @@ Two complementary approaches are used:
   mocks, so no state leaks between tests and nothing touches disk.
 - **Mocktail-backed bloc/cubit/use-case tests** (`transactions_bloc_mocktail_test.dart`,
   `categories_bloc_mocktail_test.dart`, `balance_cubit_mocktail_test.dart`,
-  `connectivity/`, `sync/watch_pending_sync_count_usecase_test.dart`)
+  `connectivity/`, `sync/watch_pending_sync_count_usecase_test.dart`,
+  `sync/sync_repository_impl_test.dart`)
   use [`bloc_test`](https://pub.dev/packages/bloc_test) and
   [`mocktail`](https://pub.dev/packages/mocktail) with mocked use cases
   ([`test/helpers/mocks.dart`](test/helpers/mocks.dart)) to assert state
   emissions in isolation, including failure paths a real repository can't be
-  forced into (see below).
+  forced into (see below). `sync/sync_repository_impl_test.dart` covers
+  `pushPending()`'s independent-row processing: one failing entry doesn't
+  block the rest of that pass.
+- **`sync/supabase_sync_data_source_test.dart`** tests the local→remote
+  payload mapping (`camelCase` → `snake_case`, `user_id` stamping) directly,
+  rather than mocking `pushEntry()`'s Supabase SDK calls end-to-end — the
+  SDK's `client.from(...).upsert(...)` chain gets its awaitability from an
+  overridden generic `then` method that `mocktail` can't reliably intercept.
 - **Pure-function tests** (`format_test.dart`,
   `backup/export_serializer_test.dart`) need neither a database nor mocks.
 
@@ -168,22 +184,28 @@ lib/
 │   │   └── presentation/
 │   │       └── widgets/
 │   │           └── offline_banner.dart      # Strip shown above screen content while offline; driven by ConnectivityCubit
-│   ├── sync/                      # Offline outbox layer (not a feature — see below)
+│   ├── sync/                      # Offline outbox + push-sync layer (not a feature — see below)
 │   │   ├── domain/
 │   │   │   ├── entities/
 │   │   │   │   ├── operation_type.dart          # create/update/delete enum, owned by domain
-│   │   │   │   └── sync_queue_entry_entity.dart # Plain domain model for one queued entry (not yet consumed — no read path exists)
+│   │   │   │   └── sync_queue_entry_entity.dart # Plain domain model for one queued entry
 │   │   │   ├── repositories/
-│   │   │   │   └── sync_queue_repository.dart   # Abstract interface — enqueue(...), watchPendingCount()
+│   │   │   │   ├── sync_queue_repository.dart   # Abstract interface — enqueue(...), getPending(), dequeue(id), watchPendingCount()
+│   │   │   │   └── sync_repository.dart         # Abstract interface — pushPending(): reads the queue, pushes each entry independently
 │   │   │   └── usecases/
-│   │   │       └── watch_pending_sync_count_usecase.dart
+│   │   │       ├── watch_pending_sync_count_usecase.dart
+│   │   │       └── push_pending_changes_usecase.dart
 │   │   ├── data/
 │   │   │   ├── models/
 │   │   │   │   └── sync_queue_entries.dart      # Drift table definition — id, entityType, entityId, operation, payload, createdAt
+│   │   │   ├── datasources/
+│   │   │   │   └── supabase_sync_data_source.dart # pushEntry(): upsert on create/update, delete().eq() on delete; maps local camelCase -> remote snake_case + stamps user_id
 │   │   │   └── repos/
-│   │   │       └── sync_queue_repository_impl.dart # Implements SyncQueueRepository against TransactionsDataSource
+│   │   │       ├── sync_queue_repository_impl.dart # Implements SyncQueueRepository against TransactionsDataSource
+│   │   │       └── sync_repository_impl.dart      # Implements SyncRepository; per-entry try/catch so one failure doesn't block the rest of the pass
 │   │   ├── cubit/
-│   │   │   └── pending_sync_cubit.dart          # Broadcasts the queue-count stream (Cubit<int>); registered as a singleton
+│   │   │   ├── pending_sync_cubit.dart          # Broadcasts the queue-count stream (Cubit<int>); registered as a singleton
+│   │   │   └── sync_cubit.dart                  # Cubit<void>; triggers pushPending() on reconnect and when the queue count increases while online
 │   │   └── presentation/
 │   │       └── widgets/
 │   │           └── pending_sync_badge.dart      # App-bar badge over PendingSyncCubit; hidden at zero

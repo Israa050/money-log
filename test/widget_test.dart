@@ -5,7 +5,10 @@ import 'package:stockflow/core/connectivity/cubit/connectivity_cubit.dart';
 import 'package:stockflow/core/connectivity/domain/network_status.dart';
 import 'package:stockflow/core/connectivity/domain/usecases/watch_connectivity_usecase.dart';
 import 'package:stockflow/core/service_locator.dart';
+import 'package:stockflow/core/result.dart';
 import 'package:stockflow/core/sync/cubit/pending_sync_cubit.dart';
+import 'package:stockflow/core/sync/cubit/sync_cubit.dart';
+import 'package:stockflow/core/sync/domain/usecases/push_pending_changes_usecase.dart';
 import 'package:stockflow/core/sync/domain/usecases/watch_pending_sync_count_usecase.dart';
 import 'package:stockflow/core/sync/data/repos/sync_queue_repository_impl.dart';
 import 'package:stockflow/core/sync/domain/repositories/sync_queue_repository.dart';
@@ -48,6 +51,14 @@ class _StubWatchPendingSyncCountUseCase
   Stream<int> call() => const Stream.empty();
 }
 
+/// Stub use case that never actually pushes anything -- SyncCubit only
+/// calls this if connectivity is online, which _StubWatchConnectivityUseCase
+/// never reports, but it needs a real implementation to construct.
+class _StubPushPendingChangesUseCase implements PushPendingChangesUseCase {
+  @override
+  Future<Result<int>> call() async => const Success(0);
+}
+
 void main() {
   testWidgets('App boots without throwing', (WidgetTester tester) async {
     // Registers against an in-memory Drift database instead of
@@ -64,6 +75,13 @@ void main() {
     getIt.registerSingleton<PendingSyncCubit>(
       PendingSyncCubit(
         watchPendingSyncCount: _StubWatchPendingSyncCountUseCase(),
+      ),
+    );
+    getIt.registerSingleton<SyncCubit>(
+      SyncCubit(
+        connectivityCubit: getIt<ConnectivityCubit>(),
+        pendingSyncCubit: getIt<PendingSyncCubit>(),
+        pushPendingChangesUseCase: _StubPushPendingChangesUseCase(),
       ),
     );
     getIt.registerSingleton<SyncQueueRepository>(

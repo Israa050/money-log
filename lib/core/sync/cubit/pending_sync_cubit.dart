@@ -5,9 +5,10 @@ import 'package:stockflow/core/sync/domain/usecases/watch_pending_sync_count_use
 
 /// Emits the number of rows currently in the sync queue.
 ///
-/// There is no drain process yet, so this count only ever grows -- see
-/// docs/sync-queue.md. The UI treats it as "changes recorded on this
-/// device", not "sync failures".
+/// SyncCubit drains this queue when connectivity comes back online, so the
+/// count drops as pushes succeed. The UI treats it as "changes not yet
+/// confirmed on the server", not "sync failures" -- a failed push just
+/// leaves its row counted here until the next retry.
 class PendingSyncCubit extends Cubit<int> {
   PendingSyncCubit({
     required WatchPendingSyncCountUseCase watchPendingSyncCount,

@@ -1,7 +1,10 @@
+import 'package:logger/logger.dart';
 import 'package:stockflow/core/result.dart';
 import 'package:stockflow/core/sync/data/datasources/supabase_sync_data_source.dart';
 import 'package:stockflow/core/sync/domain/repositories/sync_queue_repository.dart';
 import 'package:stockflow/core/sync/domain/repositories/sync_repository.dart';
+
+final _logger = Logger(printer: PrettyPrinter(methodCount: 0));
 
 class SyncRepositoryImpl implements SyncRepository {
   SyncRepositoryImpl({
@@ -25,10 +28,21 @@ class SyncRepositoryImpl implements SyncRepository {
     for (final entry in entries) {
       try {
         await supabaseSyncDataSource.pushEntry(entry);
-      } catch (_) {
-        // Push failed (network, server rejection, etc.) -- leave this entry
-        // queued and move on to the next one. No error/retry bookkeeping;
-        // it'll simply be retried on the next pushPending() call.
+      } catch (e, st) {
+        // Push failed -- leave this entry queued and move on. No
+        // error/retry bookkeeping; it's simply retried next pushPending().
+        // Logged (not swallowed) so a persistent failure stays visible.
+        //
+        // .toString() not .name: a reproduced Dart/mocktail edge case makes
+        // .name throw NoSuchMethodError in this exact catch-after-loop
+        // shape. .toString() gives "OperationType.create" instead of
+        // "create" -- same info, just qualified.
+        _logger.w(
+          'Sync push failed for ${entry.entityType}/${entry.id} '
+          '(${entry.operation.toString()}): $e',
+          error: e,
+          stackTrace: st,
+        );
         continue;
       }
 
