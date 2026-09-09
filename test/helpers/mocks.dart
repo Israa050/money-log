@@ -2,6 +2,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:stockflow/core/connectivity/domain/connectivity_repository.dart';
 import 'package:stockflow/core/connectivity/domain/usecases/watch_connectivity_usecase.dart';
+import 'package:stockflow/core/sync/data/datasources/supabase_sync_data_source.dart';
 import 'package:stockflow/core/sync/domain/repositories/sync_queue_repository.dart';
 import 'package:stockflow/features/categories/domain/repositories/category_repository.dart';
 import 'package:stockflow/features/transactions/domain/repositories/transactions_repository.dart';
@@ -49,3 +50,5 @@ class MockWatchConnectivityUseCase extends Mock
     implements WatchConnectivityUseCase {}
 
 class MockSyncQueueRepository extends Mock implements SyncQueueRepository {}
+
+class MockSupabaseDataSource extends Mock implements SupabaseSyncDataSource {}
