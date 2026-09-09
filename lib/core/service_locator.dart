@@ -5,6 +5,7 @@ import 'package:stockflow/core/connectivity/data/connectivity_repository_impl.da
 import 'package:stockflow/core/connectivity/domain/connectivity_repository.dart';
 import 'package:stockflow/core/connectivity/domain/usecases/watch_connectivity_usecase.dart';
 import 'package:stockflow/core/sync/cubit/pending_sync_cubit.dart';
+import 'package:stockflow/core/sync/cubit/sync_cubit.dart';
 import 'package:stockflow/core/sync/data/datasources/supabase_sync_data_source.dart';
 import 'package:stockflow/core/sync/data/repos/sync_queue_repository_impl.dart';
 import 'package:stockflow/core/sync/data/repos/sync_repository_impl.dart';
@@ -90,6 +91,17 @@ void setupServiceLocator() {
   getIt.registerLazySingleton<PendingSyncCubit>(
     () => PendingSyncCubit(
       watchPendingSyncCount: getIt<WatchPendingSyncCountUseCase>(),
+    ),
+  );
+
+  // App-wide singleton: one push listener for the whole app, triggered by
+  // reconnecting (ConnectivityCubit) or by a new row being queued while
+  // already online (PendingSyncCubit).
+  getIt.registerLazySingleton<SyncCubit>(
+    () => SyncCubit(
+      connectivityCubit: getIt<ConnectivityCubit>(),
+      pendingSyncCubit: getIt<PendingSyncCubit>(),
+      pushPendingChangesUseCase: getIt<PushPendingChangesUseCase>(),
     ),
   );
 
