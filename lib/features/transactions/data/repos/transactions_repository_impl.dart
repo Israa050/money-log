@@ -56,12 +56,18 @@ class TransactionsRepositoryImpl extends TransactionsRepository {
     String? categoryId,
   }) async {
     final id = const Uuid().v4();
+    // Set explicitly (rather than relying on Drift's currentDateAndTime
+    // default) so the same instant is guaranteed to appear in both the
+    // local row and the sync payload below, with no follow-up read needed.
+    final now = DateTime.now().toUtc();
     final entry = TransactionsCompanion.insert(
       id: id,
       amountMinor: amountMinor,
       type: type,
       note: Value(note),
       categoryId: Value(categoryId),
+      occurredTime: Value(now),
+      creationTime: Value(now),
     );
 
     final payload = jsonEncode({
@@ -70,6 +76,8 @@ class TransactionsRepositoryImpl extends TransactionsRepository {
       'type': type.name,
       'note': note,
       'categoryId': categoryId,
+      'occurredTime': now.toIso8601String(),
+      'creationTime': now.toIso8601String(),
     });
 
     try {

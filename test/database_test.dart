@@ -527,10 +527,10 @@ void main() {
           () async {
             final result = await dataSource.watchAllCategories.first;
             expect(result.map((c) => c.id), [
-              'default-food',
-              'default-transport',
-              'default-shopping',
-              'default-bills',
+              defaultCategoryFoodId,
+              defaultCategoryTransportId,
+              defaultCategoryShoppingId,
+              defaultCategoryBillsId,
             ]);
           },
         );
