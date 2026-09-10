@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stockflow/core/sync/cubit/pending_sync_cubit.dart';
+import 'package:stockflow/core/sync/presentation/widgets/sync_sheet.dart';
 
 /// App-bar action showing how many local changes are waiting to sync.
 ///
-/// Renders nothing when the count is zero. The count only grows for now
-/// (no drain process -- see docs/sync-queue.md), so the copy says
-/// "waiting to sync", never "failed".
+/// Always shown so sync stays reachable; the count badge only appears when
+/// there is something queued. Tapping opens the sync sheet. The copy says
+/// "waiting to sync", never "failed" -- a queued row is unconfirmed, not
+/// broken (see docs/sync-queue.md).
 class PendingSyncBadge extends StatelessWidget {
   const PendingSyncBadge({super.key});
 
@@ -14,21 +16,18 @@ class PendingSyncBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<PendingSyncCubit, int>(
       builder: (context, count) {
-        if (count == 0) return const SizedBox.shrink();
+        final tooltip = switch (count) {
+          0 => 'Sync',
+          1 => '1 change waiting to sync',
+          _ => '$count changes waiting to sync',
+        };
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Center(
-            child: Tooltip(
-              message: count == 1
-                  ? '1 change waiting to sync'
-                  : '$count changes waiting to sync',
-              child: Badge(
-                label: Text('$count'),
-                child: const Icon(Icons.cloud_upload_outlined),
-              ),
-            ),
-          ),
+        final icon = const Icon(Icons.cloud_upload_outlined);
+
+        return IconButton(
+          tooltip: tooltip,
+          onPressed: () => showSyncSheet(context),
+          icon: count == 0 ? icon : Badge(label: Text('$count'), child: icon),
         );
       },
     );
