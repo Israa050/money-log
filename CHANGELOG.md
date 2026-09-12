@@ -3,6 +3,25 @@
 Notes for each build pushed to `production`. The top entry is what
 Firebase App Distribution shows testers for the current release.
 
+## v0.6.0 — Push sync to Supabase & manual "Sync now"
+
+- Local changes now actually **sync to a server**: queued transactions and
+  categories are pushed to Supabase whenever connectivity comes back online
+  or a new change is made while already online. Sign-in is anonymous for
+  now — no account setup needed, but data doesn't yet follow you across a
+  reinstall or a second device.
+- Added a **manual "Sync now"** action: tap the pending-changes badge in
+  the app bar to open a sheet showing how many changes are waiting and a
+  button to push them immediately, instead of waiting for the automatic
+  trigger. It's disabled with a reason (syncing / offline / nothing to
+  sync) rather than just doing nothing, and shows a result once it's done
+  ("Synced N changes" or "Couldn't send your changes — they're still
+  saved on this device").
+- The pending-changes badge is now always visible in the app bar (not just
+  when something is queued), so sync is reachable at any time.
+- Failed pushes stay queued and retry automatically — nothing is silently
+  dropped.
+
 ## v0.5.0 — Offline banner & sync queue
 
 - Added a **connectivity layer** (`lib/core/connectivity/`): wraps
