@@ -65,8 +65,9 @@ delete with a countdown undo.
 - 🗂️ **Manage categories** — a dedicated screen (opened from the transactions app bar) to create, rename/recolor, and delete categories from a fixed swatch palette; deleting a category that still has transactions orphans them into "Uncategorized" instead of failing, and every change propagates live to the add-transaction chips and transaction pills
 - 👉 **Swipe to delete** — swipe a row away, then **Undo** within a 5-second countdown before it's permanently deleted
 - 📡 **Offline banner** — a strip above the transaction list appears while the device has no network interface; the copy is informational ("changes are saved on this device"), since every write is persisted and queued locally regardless of connectivity
-- 🔼 **Pending-changes badge** — an app-bar badge showing how many local writes are waiting to sync (hidden at zero); backed by the sync-queue count stream
+- 🔼 **Pending-changes badge** — an always-visible app-bar action showing how many local writes are waiting to sync (the count badge itself only appears once something is queued); tapping it opens the sync sheet
 - ☁️ **Push sync to Supabase** — queued local writes are pushed to a Supabase backend (anonymous auth, RLS scoped to `auth.uid()`) whenever connectivity comes back online or a new change is queued while already online; each row pushes independently and failed rows simply stay queued for the next retry — no status/retry-count bookkeeping needed, since upsert/delete are idempotent
+- 🔁 **Manual "Sync now"** — the sync sheet (opened from the pending-changes badge) shows the queued-change count and a button to trigger a push on demand, disabled with a reason (syncing / offline / nothing queued) instead of just doing nothing; a result snackbar ("Synced N changes" / "Couldn't send your changes" / "Already up to date") appears only for this manual path, never for the silent auto-trigger
 - 🔄 **Fully reactive** — every screen is driven by a live Drift stream; add/delete never trigger a manual reload
 - 💾 **Local persistence** — everything is stored in an on-device SQLite database via Drift
 - 📤 **Export data** — an app-bar action serializes every transaction and category to a single JSON file (off the main isolate) and opens the OS share sheet, doubling as a manual backup for this offline-first app
@@ -475,12 +476,12 @@ Every write to `Transactions` or `Categories` also writes a row to
 `SyncQueueEntries` — the local durable record of "this needs to reach the
 server eventually." This is a **transactional outbox**: the pattern of
 writing a business-data change and an "outbox" event in one atomic
-transaction, so a separate background process can drain the outbox and
-publish those events (here, to Supabase) without ever risking the data
-change and the sync record disagreeing about what happened. The actual
-background drain/push-to-Supabase process is not built yet — only the write
-side (the outbox itself) exists so far. The design rationale below is also
-captured, in shorter form, in
+transaction, so a separate process can drain the outbox and publish those
+events (here, to Supabase) without ever risking the data change and the
+sync record disagreeing about what happened. Both halves now exist: the
+write side described in this section, and the push/drain side described in
+[Push sync to Supabase](#push-sync-to-supabase) below. The design rationale
+for the outbox itself is also captured, in shorter form, in
 [`docs/sync-queue.md`](docs/sync-queue.md) — the canonical reference for
 why "always enqueue" was chosen and what is deliberately deferred.
 
@@ -533,13 +534,91 @@ why "always enqueue" was chosen and what is deliberately deferred.
   `SyncQueueRepositoryImpl`, so a third repository added later needs zero
   knowledge of the queue table's schema to participate — just the same
   four-value `enqueue(...)` call every existing writer already makes.
-- **What's still open:** the background process that actually drains
-  `SyncQueueEntries` and pushes to Supabase does not exist yet, and there is
-  no `synced`/status column on the table — every row currently counts as
-  "pending" by definition, since nothing marks or removes a row once it's
-  been enqueued. `SyncQueueRepository.watchPendingCount()` (backed by a
-  `COUNT(*)` over the table) reflects that: it's a true pending count today
-  only because nothing has drained anything yet.
+- **What's still open:** there is no `synced`/status column on the table —
+  presence in the queue *is* the pending state, by deliberate design (see
+  the next section). `SyncQueueRepository.watchPendingCount()` (backed by a
+  `COUNT(*)` over the table) is therefore "rows not yet dequeued," not
+  "rows that failed" — a row leaves the count only once its push actually
+  succeeds.
+
+### Push sync to Supabase
+
+The drain side of the outbox: `SyncRepositoryImpl.pushPending()` reads
+every queued row, pushes each one to Supabase independently, and dequeues
+it on success. `SyncCubit` decides *when* this runs; `SyncNowButton`/
+`SyncSheet` let the user run it *on demand* too. Full decision log in
+[`docs/week5-decisions-and-interview-prep.md`](docs/week5-decisions-and-interview-prep.md).
+
+- **Auth is anonymous for now.** `main()` calls `signInAnonymously()` before
+  `runApp` so `auth.uid()` is always non-null, which is what Supabase's Row
+  Level Security policies actually check. Trade-off, accepted deliberately:
+  each fresh install mints a brand-new `auth.uid()`, so there is no durable
+  identity across reinstalls/devices yet — real email/password auth is
+  future work.
+- **Per-row failures don't block the rest of the queue.** `pushPending()`
+  loops with a `try`/`catch` around each entry: a row that fails to push
+  (network, RLS, a bad id) is logged and left queued for the next attempt;
+  the loop continues to the next row rather than aborting the whole pass.
+  This is safe specifically because `pushEntry`'s Supabase calls are
+  idempotent — `.upsert()` for create/update, and `.delete().eq('id', ...)`
+  for delete, which is already a no-op success (not an error) when the row
+  is already gone.
+- **No `status`/retry-count/error column, by choice.** A row's mere
+  presence in `SyncQueueEntries` *is* "not yet confirmed on the server" —
+  adding bookkeeping columns for retry counts or backoff was rejected as
+  solving a problem this app doesn't have yet at solo-user scale. The one
+  concession is per-row error *logging* (not persisted state) so a
+  persistently failing row is at least visible in the console instead of
+  silently retried forever.
+- **The local→remote field mapping lives at the push boundary, not in the
+  domain model.** `SupabaseSyncDataSource.mapForSupabase()` renames
+  camelCase to snake_case (`amountMinor` → `amount_minor`, etc.) and stamps
+  `user_id` immediately before the network call — the local Drift models
+  and the queued payload never learn that Supabase, or its column-naming
+  convention, exists. This also means a queued row written before an app
+  update still pushes correctly after the update changes the mapping,
+  since the mapping is applied at push time, not at enqueue time.
+- **`SyncCubit` auto-triggers a push on two signals:** connectivity
+  regaining `online`, and the pending count *increasing* while already
+  online (covers "add a transaction while connected," which doesn't change
+  `NetworkStatus` and so wouldn't otherwise be noticed). A count
+  *decreasing* never re-triggers a push — that's a push having just
+  succeeded, not a new change arriving.
+- **`SyncCubit` exposes its outcome as state** (`SyncIdle` /
+  `SyncInProgress` / `SyncCompleted` / `SyncFailure`), each carrying an
+  `isManual` flag distinguishing a user-triggered `syncNow()` call from an
+  auto-trigger. This is what lets the UI show a spinner and a result
+  snackbar only for a push the user actually asked for — the silent
+  auto-trigger stays silent. An in-flight guard (`if (state is
+  SyncInProgress) return;`) stops a manual tap from stacking a second push
+  on top of one already running.
+- **`SyncCompleted.allFailed` is inferred, not observed.**
+  `pushPending()` returns only a count of rows that fully succeeded — if
+  every row in the queue fails, the return value is indistinguishable from
+  "there was nothing to push." `SyncCubit` compares the pending count
+  immediately before and after the push: non-empty before, zero pushed
+  after, means everything failed. This is a deliberate, documented
+  trade-off — an error *message* still isn't available in the UI, only the
+  fact that nothing went through; upgrading `pushPending()`'s return type
+  to a small success/failure-count summary is the known next step if that
+  becomes a real pain point.
+- **Default categories are a known, deferred gap.** The four seeded
+  categories are inserted directly by Drift's `onCreate`, bypassing
+  `CategoryRepositoryImpl.addCategory()` entirely — so they are never
+  enqueued and never reach Supabase for any user. A guarded
+  `enqueueDefaultCategories()` was built and then deliberately reverted: no
+  correct one-shot guard existed without a persisted flag, and re-enqueuing
+  on every launch would grow the queue unboundedly. Deferred until real
+  (non-anonymous) auth exists, at which point a per-account seed becomes
+  possible.
+- **Not yet built:** pull sync (downloading changes made on another
+  device/reinstall) does not exist — this app can only upload. Conflict
+  resolution between two devices editing the same row is untested and
+  would currently resolve as last-write-wins. No mocked-Supabase test
+  exists for `pushEntry()` itself (`SupabaseSyncDataSource.mapForSupabase()`
+  is tested directly instead — see [Running tests](#running-tests) — since
+  mocktail can't reliably intercept the Supabase SDK's `.upsert()`
+  awaitable chain).
 
 ### Export data (manual backup)
 
@@ -931,19 +1010,41 @@ above).
     not a returned value) and re-caught just outside to restore the
     `Result<T>` contract callers expect.
   - `WatchPendingSyncCountUseCase` wraps `watchPendingCount()` the same way
-    `WatchBalanceUseCase` wraps `watchBalance()`. It is now registered in
+    `WatchBalanceUseCase` wraps `watchBalance()`. It is registered in
     `service_locator.dart` and consumed by `PendingSyncCubit` (a
     `Cubit<int>` shaped like `BalanceCubit`), which `PendingSyncBadge`
     (`lib/core/sync/presentation/widgets/pending_sync_badge.dart`) renders as
-    an app-bar badge — hidden when the count is zero. Because no drain
-    process exists, the count only ever grows, so the badge's tooltip says
-    "N changes waiting to sync", never "failed". `PendingSyncCubit` is
-    provided app-wide via `BlocProvider.value` in `main.dart`, same as
-    `ConnectivityCubit`.
-  - **Not yet built:** the actual background process that drains
-    `SyncQueueEntries` and pushes to Supabase, and a `synced`/status column
-    to distinguish drained rows from pending ones — every row currently
-    counts as pending by definition. See [Not yet done](#-not-yet-done).
+    an always-visible app-bar action (the numeric badge itself only shows
+    once something is queued). A row leaves the count once its push
+    actually succeeds, so the tooltip says "N changes waiting to sync",
+    never "failed" — a row still in the queue means "not yet confirmed,"
+    not "broken." `PendingSyncCubit` is provided app-wide via
+    `BlocProvider.value` in `main.dart`, same as `ConnectivityCubit`.
+- **Push sync + manual "Sync now" (new):** the drain side of the outbox —
+  see [Push sync to Supabase](#push-sync-to-supabase) above for the full
+  design writeup (idempotent per-row pushes, the local→remote field
+  mapping, the auto-trigger rules, `SyncCubit`'s state, and the
+  `allFailed`-inference trade-off).
+  - `SupabaseSyncDataSource` (`pushEntry`, `mapForSupabase`),
+    `SyncRepository`/`SyncRepositoryImpl` (`pushPending()`), and
+    `PushPendingChangesUseCase`, all registered in `service_locator.dart`.
+  - `SyncCubit` — now `Cubit<SyncState>` (`SyncIdle` / `SyncInProgress` /
+    `SyncCompleted` / `SyncFailure`, each carrying an `isManual` flag) —
+    auto-triggers `pushPending()` on reconnect and on a pending-count
+    increase while online, and exposes `syncNow()` for a user-triggered
+    push with an in-flight guard against double-firing.
+  - `SyncNowButton` (disabled with a tooltip reason while syncing, offline,
+    or when the queue is empty) and `SyncSheet` (pending count, the
+    button, an upload-only disclaimer, and a manual-only result snackbar),
+    opened by tapping `PendingSyncBadge`.
+  - Anonymous Supabase auth (`signInAnonymously()` in `main()`) is what
+    gives every write a non-null `auth.uid()` for RLS to check against —
+    see [Push sync to Supabase](#push-sync-to-supabase) for the durable-
+    identity trade-off this implies.
+  - **Not yet built:** pull sync, per-row error messages surfaced in the
+    UI (only the fact that a push failed, not why), and syncing the four
+    seeded default categories for a real (non-anonymous) account. See
+    [Not yet done](#-not-yet-done).
 - `AppBlocObserver` — logs every Bloc event, state change, and error via the
   `logger` package.
 - Full presentation layer: transactions screen with balance summary,
@@ -1082,15 +1183,19 @@ above).
 - The offline banner reflects network *interface* state, not reachability
   (that's all `connectivity_plus` reports) — no captive-portal/dead-Wi-Fi
   detection, and no action is gated on network state.
-- The sync queue (`SyncQueueEntries`) only has a write side. There is no
-  background process draining it and pushing to Supabase, and no
-  `synced`/status column to tell a drained row from a pending one — so the
-  pending-changes badge count only ever grows (it's "changes recorded on
-  this device", not "sync failures").
-- Only `Transactions` and `Categories` writes enqueue to the sync queue —
-  there is no actual Supabase client/project wired up anywhere in the app
-  yet, so "sync" today means "durably recorded locally," not "reached the
-  server."
+- Push sync is upload-only — there is no pull sync, so a second
+  device/reinstall cannot receive changes made elsewhere, and two devices
+  editing the same row concurrently would resolve as last-write-wins with
+  no conflict handling.
+- No `status`/error column on `SyncQueueEntries` (a deliberate choice, see
+  [Push sync to Supabase](#push-sync-to-supabase)) means the UI can say a
+  push failed but not *why* — `SyncCompleted.allFailed` is inferred from a
+  before/after count comparison, not read from an actual error.
+- The four seeded default categories are never enqueued (they bypass
+  `CategoryRepositoryImpl.addCategory()`), so they never reach Supabase for
+  any user — deferred until real, non-anonymous auth exists.
+- Anonymous auth means no durable identity across reinstalls/devices —
+  every fresh install gets a new `auth.uid()` with no data carried over.
 - **Export data's button doesn't trigger an export yet** — `ExportAction`'s
   `onPressed` is a deliberate no-op for now (see
   [What's implemented](#-whats-implemented) above); the cubit/use
@@ -1100,11 +1205,62 @@ above).
 
 ## 🏷️ Release notes
 
-### Unreleased — Connectivity & offline sync queue
+### v0.6.0 — Push sync to Supabase & manual "Sync now"
+
+Adds the drain side of the transactional outbox described below, plus a
+user-triggered path on top of it. See
+[Push sync to Supabase](#push-sync-to-supabase) above for the full design
+writeup and [`docs/week5-decisions-and-interview-prep.md`](docs/week5-decisions-and-interview-prep.md)
+for the decision log.
+
+**Push sync**
+
+- Added `lib/core/env/supabase_config.dart` (reads the URL/anon key from
+  `--dart-define-from-file`) and wired `supabase_flutter`: `main()` now
+  calls `Supabase.initialize` and `signInAnonymously()` before `runApp`.
+- Added `SupabaseSyncDataSource` (`pushEntry`, `mapForSupabase`) and
+  `SyncRepository`/`SyncRepositoryImpl.pushPending()` — reads the queue,
+  pushes each row independently (one failure doesn't block the rest of the
+  pass), dequeues on success, returns a count of fully-completed rows.
+- `SyncCubit` — previously `Cubit<void>`, existing only to own two
+  subscriptions — auto-triggers `pushPending()` on reconnect and on a
+  pending-count increase while online.
+- Fixed default category ids from human-readable strings (`'default-food'`)
+  to real UUIDs — Supabase's `id` column is typed `uuid` and rejected the
+  old values.
+
+**Manual "Sync now"**
+
+- `SyncCubit` is now `Cubit<SyncState>` (`SyncIdle` / `SyncInProgress` /
+  `SyncCompleted` / `SyncFailure`, each carrying `isManual`) instead of
+  `Cubit<void>`, plus a public `syncNow()` and an in-flight guard.
+- Added `SyncNowButton` and `SyncSheet` (pending count, the button, an
+  upload-only disclaimer, a manual-only result snackbar), opened by tapping
+  `PendingSyncBadge` — which is now always visible instead of hidden at a
+  zero count.
+
+**Tests**
+
+- `test/sync/sync_repository_impl_test.dart` — `pushPending()`'s
+  independent-row processing, dequeue-on-success, and the
+  `getPending()`-failure short-circuit.
+- `test/sync/supabase_sync_data_source_test.dart` — `mapForSupabase()`'s
+  camelCase→snake_case + `user_id`-stamping, tested directly rather than
+  through `pushEntry()`'s Supabase calls (mocktail can't reliably intercept
+  the SDK's `.upsert()` awaitable chain).
+- Cubit/widget tests for `SyncCubit`'s new state and `SyncNowButton`/
+  `SyncSheet` are still pending.
+
+**Not built yet**
+
+- Pull sync, per-row error messages in the UI (only pass/fail is inferred,
+  not why), and syncing the default categories for a real account — see
+  [Not yet done](#-not-yet-done).
+
+### v0.5.0 — Connectivity & offline sync queue
 
 Groups the connectivity layer, the transactional-outbox sync queue, and the
-two UI affordances they drive (offline banner, pending-changes badge). Cut a
-tag from these notes when this ships.
+two UI affordances they drive (offline banner, pending-changes badge).
 
 **Connectivity layer**
 
@@ -1180,12 +1336,11 @@ tag from these notes when this ships.
 - Widget/cubit tests for `OfflineBanner`, `PendingSyncCubit`, and
   `PendingSyncBadge` are still pending — see [Not yet done](#-not-yet-done).
 
-**Not built yet**
+**Not built yet, as of this release**
 
 - The background process that drains `SyncQueueEntries` and pushes to
-  Supabase; a `synced`/status column (so the pending count only grows for
-  now); no Supabase client/project exists yet, so "sync" means "durably
-  recorded locally". See [Not yet done](#-not-yet-done).
+  Supabase, and no Supabase client/project existed yet — both landed in
+  the push-sync release above this one.
 
 ### v0.4.0 — Manage categories
 
