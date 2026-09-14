@@ -38,8 +38,20 @@ class $CategoriesTable extends Categories
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, name, colorHex];
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, colorHex, updatedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -71,6 +83,12 @@ class $CategoriesTable extends Categories
         colorHex.isAcceptableOrUnknown(data['color_hex']!, _colorHexMeta),
       );
     }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -92,6 +110,10 @@ class $CategoriesTable extends Categories
         DriftSqlType.string,
         data['${effectivePrefix}color_hex'],
       ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
     );
   }
 
@@ -105,7 +127,13 @@ class Category extends DataClass implements Insertable<Category> {
   final String id;
   final String name;
   final String? colorHex;
-  const Category({required this.id, required this.name, this.colorHex});
+  final DateTime updatedAt;
+  const Category({
+    required this.id,
+    required this.name,
+    this.colorHex,
+    required this.updatedAt,
+  });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -114,6 +142,7 @@ class Category extends DataClass implements Insertable<Category> {
     if (!nullToAbsent || colorHex != null) {
       map['color_hex'] = Variable<String>(colorHex);
     }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
 
@@ -124,6 +153,7 @@ class Category extends DataClass implements Insertable<Category> {
       colorHex: colorHex == null && nullToAbsent
           ? const Value.absent()
           : Value(colorHex),
+      updatedAt: Value(updatedAt),
     );
   }
 
@@ -136,6 +166,7 @@ class Category extends DataClass implements Insertable<Category> {
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       colorHex: serializer.fromJson<String?>(json['colorHex']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
   factory Category.fromJsonString(
@@ -152,6 +183,7 @@ class Category extends DataClass implements Insertable<Category> {
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'colorHex': serializer.toJson<String?>(colorHex),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
 
@@ -159,16 +191,19 @@ class Category extends DataClass implements Insertable<Category> {
     String? id,
     String? name,
     Value<String?> colorHex = const Value.absent(),
+    DateTime? updatedAt,
   }) => Category(
     id: id ?? this.id,
     name: name ?? this.name,
     colorHex: colorHex.present ? colorHex.value : this.colorHex,
+    updatedAt: updatedAt ?? this.updatedAt,
   );
   Category copyWithCompanion(CategoriesCompanion data) {
     return Category(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
       colorHex: data.colorHex.present ? data.colorHex.value : this.colorHex,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
@@ -177,37 +212,42 @@ class Category extends DataClass implements Insertable<Category> {
     return (StringBuffer('Category(')
           ..write('id: $id, ')
           ..write('name: $name, ')
-          ..write('colorHex: $colorHex')
+          ..write('colorHex: $colorHex, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, colorHex);
+  int get hashCode => Object.hash(id, name, colorHex, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Category &&
           other.id == this.id &&
           other.name == this.name &&
-          other.colorHex == this.colorHex);
+          other.colorHex == this.colorHex &&
+          other.updatedAt == this.updatedAt);
 }
 
 class CategoriesCompanion extends UpdateCompanion<Category> {
   final Value<String> id;
   final Value<String> name;
   final Value<String?> colorHex;
+  final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const CategoriesCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.colorHex = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CategoriesCompanion.insert({
     required String id,
     required String name,
     this.colorHex = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name);
@@ -215,12 +255,14 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     Expression<String>? id,
     Expression<String>? name,
     Expression<String>? colorHex,
+    Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (colorHex != null) 'color_hex': colorHex,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -229,12 +271,14 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     Value<String>? id,
     Value<String>? name,
     Value<String?>? colorHex,
+    Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
     return CategoriesCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
       colorHex: colorHex ?? this.colorHex,
+      updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -251,6 +295,9 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     if (colorHex.present) {
       map['color_hex'] = Variable<String>(colorHex.value);
     }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -263,6 +310,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('colorHex: $colorHex, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -337,6 +385,18 @@ class $TransactionsTable extends Transactions
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
   static const VerificationMeta _categoryIdMeta = const VerificationMeta(
     'categoryId',
   );
@@ -359,6 +419,7 @@ class $TransactionsTable extends Transactions
     note,
     occurredTime,
     creationTime,
+    updatedAt,
     categoryId,
   ];
   @override
@@ -413,6 +474,12 @@ class $TransactionsTable extends Transactions
         ),
       );
     }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
     if (data.containsKey('category_id')) {
       context.handle(
         _categoryIdMeta,
@@ -454,6 +521,10 @@ class $TransactionsTable extends Transactions
         DriftSqlType.dateTime,
         data['${effectivePrefix}creation_time'],
       )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
       categoryId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}category_id'],
@@ -477,6 +548,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   final String? note;
   final DateTime occurredTime;
   final DateTime creationTime;
+  final DateTime updatedAt;
   final String? categoryId;
   const Transaction({
     required this.id,
@@ -485,6 +557,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     this.note,
     required this.occurredTime,
     required this.creationTime,
+    required this.updatedAt,
     this.categoryId,
   });
   @override
@@ -502,6 +575,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     }
     map['occurred_time'] = Variable<DateTime>(occurredTime);
     map['creation_time'] = Variable<DateTime>(creationTime);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || categoryId != null) {
       map['category_id'] = Variable<String>(categoryId);
     }
@@ -516,6 +590,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
       occurredTime: Value(occurredTime),
       creationTime: Value(creationTime),
+      updatedAt: Value(updatedAt),
       categoryId: categoryId == null && nullToAbsent
           ? const Value.absent()
           : Value(categoryId),
@@ -536,6 +611,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       note: serializer.fromJson<String?>(json['note']),
       occurredTime: serializer.fromJson<DateTime>(json['occurredTime']),
       creationTime: serializer.fromJson<DateTime>(json['creationTime']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       categoryId: serializer.fromJson<String?>(json['categoryId']),
     );
   }
@@ -558,6 +634,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       'note': serializer.toJson<String?>(note),
       'occurredTime': serializer.toJson<DateTime>(occurredTime),
       'creationTime': serializer.toJson<DateTime>(creationTime),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'categoryId': serializer.toJson<String?>(categoryId),
     };
   }
@@ -569,6 +646,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     Value<String?> note = const Value.absent(),
     DateTime? occurredTime,
     DateTime? creationTime,
+    DateTime? updatedAt,
     Value<String?> categoryId = const Value.absent(),
   }) => Transaction(
     id: id ?? this.id,
@@ -577,6 +655,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     note: note.present ? note.value : this.note,
     occurredTime: occurredTime ?? this.occurredTime,
     creationTime: creationTime ?? this.creationTime,
+    updatedAt: updatedAt ?? this.updatedAt,
     categoryId: categoryId.present ? categoryId.value : this.categoryId,
   );
   Transaction copyWithCompanion(TransactionsCompanion data) {
@@ -593,6 +672,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       creationTime: data.creationTime.present
           ? data.creationTime.value
           : this.creationTime,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       categoryId: data.categoryId.present
           ? data.categoryId.value
           : this.categoryId,
@@ -608,6 +688,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
           ..write('note: $note, ')
           ..write('occurredTime: $occurredTime, ')
           ..write('creationTime: $creationTime, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('categoryId: $categoryId')
           ..write(')'))
         .toString();
@@ -621,6 +702,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     note,
     occurredTime,
     creationTime,
+    updatedAt,
     categoryId,
   );
   @override
@@ -633,6 +715,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
           other.note == this.note &&
           other.occurredTime == this.occurredTime &&
           other.creationTime == this.creationTime &&
+          other.updatedAt == this.updatedAt &&
           other.categoryId == this.categoryId);
 }
 
@@ -643,6 +726,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
   final Value<String?> note;
   final Value<DateTime> occurredTime;
   final Value<DateTime> creationTime;
+  final Value<DateTime> updatedAt;
   final Value<String?> categoryId;
   final Value<int> rowid;
   const TransactionsCompanion({
@@ -652,6 +736,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     this.note = const Value.absent(),
     this.occurredTime = const Value.absent(),
     this.creationTime = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.categoryId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -662,6 +747,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     this.note = const Value.absent(),
     this.occurredTime = const Value.absent(),
     this.creationTime = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.categoryId = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -674,6 +760,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     Expression<String>? note,
     Expression<DateTime>? occurredTime,
     Expression<DateTime>? creationTime,
+    Expression<DateTime>? updatedAt,
     Expression<String>? categoryId,
     Expression<int>? rowid,
   }) {
@@ -684,6 +771,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
       if (note != null) 'note': note,
       if (occurredTime != null) 'occurred_time': occurredTime,
       if (creationTime != null) 'creation_time': creationTime,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (categoryId != null) 'category_id': categoryId,
       if (rowid != null) 'rowid': rowid,
     });
@@ -696,6 +784,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     Value<String?>? note,
     Value<DateTime>? occurredTime,
     Value<DateTime>? creationTime,
+    Value<DateTime>? updatedAt,
     Value<String?>? categoryId,
     Value<int>? rowid,
   }) {
@@ -706,6 +795,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
       note: note ?? this.note,
       occurredTime: occurredTime ?? this.occurredTime,
       creationTime: creationTime ?? this.creationTime,
+      updatedAt: updatedAt ?? this.updatedAt,
       categoryId: categoryId ?? this.categoryId,
       rowid: rowid ?? this.rowid,
     );
@@ -734,6 +824,9 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     if (creationTime.present) {
       map['creation_time'] = Variable<DateTime>(creationTime.value);
     }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
     if (categoryId.present) {
       map['category_id'] = Variable<String>(categoryId.value);
     }
@@ -752,6 +845,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
           ..write('note: $note, ')
           ..write('occurredTime: $occurredTime, ')
           ..write('creationTime: $creationTime, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('categoryId: $categoryId, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -1183,6 +1277,221 @@ class SyncQueueEntriesCompanion extends UpdateCompanion<SyncQueueEntry> {
   }
 }
 
+class $SyncMetaTable extends SyncMeta
+    with TableInfo<$SyncMetaTable, SyncMetaData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SyncMetaTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _keyMeta = const VerificationMeta('key');
+  @override
+  late final GeneratedColumn<String> key = GeneratedColumn<String>(
+    'key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _valueMeta = const VerificationMeta('value');
+  @override
+  late final GeneratedColumn<DateTime> value = GeneratedColumn<DateTime>(
+    'value',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [key, value];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sync_meta';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SyncMetaData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('key')) {
+      context.handle(
+        _keyMeta,
+        key.isAcceptableOrUnknown(data['key']!, _keyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_keyMeta);
+    }
+    if (data.containsKey('value')) {
+      context.handle(
+        _valueMeta,
+        value.isAcceptableOrUnknown(data['value']!, _valueMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_valueMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {key};
+  @override
+  SyncMetaData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SyncMetaData(
+      key: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}key'],
+      )!,
+      value: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}value'],
+      )!,
+    );
+  }
+
+  @override
+  $SyncMetaTable createAlias(String alias) {
+    return $SyncMetaTable(attachedDatabase, alias);
+  }
+}
+
+class SyncMetaData extends DataClass implements Insertable<SyncMetaData> {
+  final String key;
+  final DateTime value;
+  const SyncMetaData({required this.key, required this.value});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['key'] = Variable<String>(key);
+    map['value'] = Variable<DateTime>(value);
+    return map;
+  }
+
+  SyncMetaCompanion toCompanion(bool nullToAbsent) {
+    return SyncMetaCompanion(key: Value(key), value: Value(value));
+  }
+
+  factory SyncMetaData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SyncMetaData(
+      key: serializer.fromJson<String>(json['key']),
+      value: serializer.fromJson<DateTime>(json['value']),
+    );
+  }
+  factory SyncMetaData.fromJsonString(
+    String encodedJson, {
+    ValueSerializer? serializer,
+  }) => SyncMetaData.fromJson(
+    DataClass.parseJson(encodedJson) as Map<String, dynamic>,
+    serializer: serializer,
+  );
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'key': serializer.toJson<String>(key),
+      'value': serializer.toJson<DateTime>(value),
+    };
+  }
+
+  SyncMetaData copyWith({String? key, DateTime? value}) =>
+      SyncMetaData(key: key ?? this.key, value: value ?? this.value);
+  SyncMetaData copyWithCompanion(SyncMetaCompanion data) {
+    return SyncMetaData(
+      key: data.key.present ? data.key.value : this.key,
+      value: data.value.present ? data.value.value : this.value,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncMetaData(')
+          ..write('key: $key, ')
+          ..write('value: $value')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(key, value);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SyncMetaData &&
+          other.key == this.key &&
+          other.value == this.value);
+}
+
+class SyncMetaCompanion extends UpdateCompanion<SyncMetaData> {
+  final Value<String> key;
+  final Value<DateTime> value;
+  final Value<int> rowid;
+  const SyncMetaCompanion({
+    this.key = const Value.absent(),
+    this.value = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SyncMetaCompanion.insert({
+    required String key,
+    required DateTime value,
+    this.rowid = const Value.absent(),
+  }) : key = Value(key),
+       value = Value(value);
+  static Insertable<SyncMetaData> custom({
+    Expression<String>? key,
+    Expression<DateTime>? value,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (key != null) 'key': key,
+      if (value != null) 'value': value,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SyncMetaCompanion copyWith({
+    Value<String>? key,
+    Value<DateTime>? value,
+    Value<int>? rowid,
+  }) {
+    return SyncMetaCompanion(
+      key: key ?? this.key,
+      value: value ?? this.value,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (key.present) {
+      map['key'] = Variable<String>(key.value);
+    }
+    if (value.present) {
+      map['value'] = Variable<DateTime>(value.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncMetaCompanion(')
+          ..write('key: $key, ')
+          ..write('value: $value, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$TransactionsDataSource extends GeneratedDatabase {
   _$TransactionsDataSource(QueryExecutor e) : super(e);
   $TransactionsDataSourceManager get managers =>
@@ -1192,6 +1501,7 @@ abstract class _$TransactionsDataSource extends GeneratedDatabase {
   late final $SyncQueueEntriesTable syncQueueEntries = $SyncQueueEntriesTable(
     this,
   );
+  late final $SyncMetaTable syncMeta = $SyncMetaTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1200,6 +1510,7 @@ abstract class _$TransactionsDataSource extends GeneratedDatabase {
     categories,
     transactions,
     syncQueueEntries,
+    syncMeta,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -1218,6 +1529,7 @@ typedef $$CategoriesTableCreateCompanionBuilder =
       required String id,
       required String name,
       Value<String?> colorHex,
+      Value<DateTime> updatedAt,
       Value<int> rowid,
     });
 typedef $$CategoriesTableUpdateCompanionBuilder =
@@ -1225,6 +1537,7 @@ typedef $$CategoriesTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> name,
       Value<String?> colorHex,
+      Value<DateTime> updatedAt,
       Value<int> rowid,
     });
 
@@ -1277,6 +1590,11 @@ class $$CategoriesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> transactionsRefs(
     Expression<bool> Function($$TransactionsTableFilterComposer f) f,
   ) {
@@ -1326,6 +1644,11 @@ class $$CategoriesTableOrderingComposer
     column: $table.colorHex,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CategoriesTableAnnotationComposer
@@ -1345,6 +1668,9 @@ class $$CategoriesTableAnnotationComposer
 
   GeneratedColumn<String> get colorHex =>
       $composableBuilder(column: $table.colorHex, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   Expression<T> transactionsRefs<T extends Object>(
     Expression<T> Function($$TransactionsTableAnnotationComposer a) f,
@@ -1405,11 +1731,13 @@ class $$CategoriesTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String?> colorHex = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CategoriesCompanion(
                 id: id,
                 name: name,
                 colorHex: colorHex,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -1417,11 +1745,13 @@ class $$CategoriesTableTableManager
                 required String id,
                 required String name,
                 Value<String?> colorHex = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CategoriesCompanion.insert(
                 id: id,
                 name: name,
                 colorHex: colorHex,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -1488,6 +1818,7 @@ typedef $$TransactionsTableCreateCompanionBuilder =
       Value<String?> note,
       Value<DateTime> occurredTime,
       Value<DateTime> creationTime,
+      Value<DateTime> updatedAt,
       Value<String?> categoryId,
       Value<int> rowid,
     });
@@ -1499,6 +1830,7 @@ typedef $$TransactionsTableUpdateCompanionBuilder =
       Value<String?> note,
       Value<DateTime> occurredTime,
       Value<DateTime> creationTime,
+      Value<DateTime> updatedAt,
       Value<String?> categoryId,
       Value<int> rowid,
     });
@@ -1570,6 +1902,11 @@ class $$TransactionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$CategoriesTableFilterComposer get categoryId {
     final $$CategoriesTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -1633,6 +1970,11 @@ class $$TransactionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$CategoriesTableOrderingComposer get categoryId {
     final $$CategoriesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -1689,6 +2031,9 @@ class $$TransactionsTableAnnotationComposer
     column: $table.creationTime,
     builder: (column) => column,
   );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   $$CategoriesTableAnnotationComposer get categoryId {
     final $$CategoriesTableAnnotationComposer composer = $composerBuilder(
@@ -1750,6 +2095,7 @@ class $$TransactionsTableTableManager
                 Value<String?> note = const Value.absent(),
                 Value<DateTime> occurredTime = const Value.absent(),
                 Value<DateTime> creationTime = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<String?> categoryId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TransactionsCompanion(
@@ -1759,6 +2105,7 @@ class $$TransactionsTableTableManager
                 note: note,
                 occurredTime: occurredTime,
                 creationTime: creationTime,
+                updatedAt: updatedAt,
                 categoryId: categoryId,
                 rowid: rowid,
               ),
@@ -1770,6 +2117,7 @@ class $$TransactionsTableTableManager
                 Value<String?> note = const Value.absent(),
                 Value<DateTime> occurredTime = const Value.absent(),
                 Value<DateTime> creationTime = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<String?> categoryId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TransactionsCompanion.insert(
@@ -1779,6 +2127,7 @@ class $$TransactionsTableTableManager
                 note: note,
                 occurredTime: occurredTime,
                 creationTime: creationTime,
+                updatedAt: updatedAt,
                 categoryId: categoryId,
                 rowid: rowid,
               ),
@@ -2081,6 +2430,149 @@ typedef $$SyncQueueEntriesTableProcessedTableManager =
       SyncQueueEntry,
       PrefetchHooks Function()
     >;
+typedef $$SyncMetaTableCreateCompanionBuilder =
+    SyncMetaCompanion Function({
+      required String key,
+      required DateTime value,
+      Value<int> rowid,
+    });
+typedef $$SyncMetaTableUpdateCompanionBuilder =
+    SyncMetaCompanion Function({
+      Value<String> key,
+      Value<DateTime> value,
+      Value<int> rowid,
+    });
+
+class $$SyncMetaTableFilterComposer
+    extends Composer<_$TransactionsDataSource, $SyncMetaTable> {
+  $$SyncMetaTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SyncMetaTableOrderingComposer
+    extends Composer<_$TransactionsDataSource, $SyncMetaTable> {
+  $$SyncMetaTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SyncMetaTableAnnotationComposer
+    extends Composer<_$TransactionsDataSource, $SyncMetaTable> {
+  $$SyncMetaTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get key =>
+      $composableBuilder(column: $table.key, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get value =>
+      $composableBuilder(column: $table.value, builder: (column) => column);
+}
+
+class $$SyncMetaTableTableManager
+    extends
+        RootTableManager<
+          _$TransactionsDataSource,
+          $SyncMetaTable,
+          SyncMetaData,
+          $$SyncMetaTableFilterComposer,
+          $$SyncMetaTableOrderingComposer,
+          $$SyncMetaTableAnnotationComposer,
+          $$SyncMetaTableCreateCompanionBuilder,
+          $$SyncMetaTableUpdateCompanionBuilder,
+          (
+            SyncMetaData,
+            BaseReferences<
+              _$TransactionsDataSource,
+              $SyncMetaTable,
+              SyncMetaData
+            >,
+          ),
+          SyncMetaData,
+          PrefetchHooks Function()
+        > {
+  $$SyncMetaTableTableManager(_$TransactionsDataSource db, $SyncMetaTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SyncMetaTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SyncMetaTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SyncMetaTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> key = const Value.absent(),
+                Value<DateTime> value = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SyncMetaCompanion(key: key, value: value, rowid: rowid),
+          createCompanionCallback:
+              ({
+                required String key,
+                required DateTime value,
+                Value<int> rowid = const Value.absent(),
+              }) => SyncMetaCompanion.insert(
+                key: key,
+                value: value,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SyncMetaTableProcessedTableManager =
+    ProcessedTableManager<
+      _$TransactionsDataSource,
+      $SyncMetaTable,
+      SyncMetaData,
+      $$SyncMetaTableFilterComposer,
+      $$SyncMetaTableOrderingComposer,
+      $$SyncMetaTableAnnotationComposer,
+      $$SyncMetaTableCreateCompanionBuilder,
+      $$SyncMetaTableUpdateCompanionBuilder,
+      (
+        SyncMetaData,
+        BaseReferences<_$TransactionsDataSource, $SyncMetaTable, SyncMetaData>,
+      ),
+      SyncMetaData,
+      PrefetchHooks Function()
+    >;
 
 class $TransactionsDataSourceManager {
   final _$TransactionsDataSource _db;
@@ -2091,4 +2583,6 @@ class $TransactionsDataSourceManager {
       $$TransactionsTableTableManager(_db, _db.transactions);
   $$SyncQueueEntriesTableTableManager get syncQueueEntries =>
       $$SyncQueueEntriesTableTableManager(_db, _db.syncQueueEntries);
+  $$SyncMetaTableTableManager get syncMeta =>
+      $$SyncMetaTableTableManager(_db, _db.syncMeta);
 }

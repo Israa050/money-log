@@ -37,6 +37,31 @@ class SupabaseSyncDataSource {
     }
   }
 
+  /// Fetches every row in [entityType]'s remote table belonging to the
+  /// current user that changed after [since], oldest first. [since] should
+  /// be the start of the previous pull (see SyncRepositoryImpl), not its
+  /// completion, so a row that changes while this pull is in flight is
+  /// simply picked up again next time rather than missed.
+  ///
+  /// Remote deletes are not represented here: pushEntry hard-deletes rows on
+  /// delete, leaving no tombstone to pull, so a delete made on one device
+  /// is not currently propagated to others via pull. Out of scope for now
+  /// -- see brief.
+  Future<List<Map<String, dynamic>>> pullChanges({
+    required String entityType,
+    required DateTime since,
+  }) async {
+    final tableName = _tableNames[entityType] ?? entityType;
+    final userId = client.auth.currentUser!.id;
+    final rows = await client
+        .from(tableName)
+        .select()
+        .eq('user_id', userId)
+        .gt('updated_at', since.toIso8601String())
+        .order('updated_at');
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
   /// Translates a locally-stored payload (camelCase, Drift-native field
   /// names) into the shape Supabase's tables actually expect (snake_case,
   /// plus the owning user_id required by their "own rows only" RLS
@@ -64,6 +89,7 @@ class SupabaseSyncDataSource {
           'category_id': local['categoryId'],
           'occurred_at': local['occurredTime'],
           'created_at': local['creationTime'],
+          'updated_at': local['updatedAt'],
         };
       case 'category':
         return {
@@ -71,6 +97,7 @@ class SupabaseSyncDataSource {
           'user_id': userId,
           'name': local['name'],
           'color_hex': local['colorHex'],
+          'updated_at': local['updatedAt'],
         };
       default:
         return local;

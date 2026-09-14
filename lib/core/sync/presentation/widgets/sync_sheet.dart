@@ -33,14 +33,27 @@ class SyncSheet extends StatelessWidget {
   void _onSyncState(BuildContext context, SyncState state) {
     final String text;
     switch (state) {
-      case SyncCompleted(:final isManual, :final allFailed, :final pushedCount)
+      case SyncCompleted(
+            :final isManual,
+            :final allFailed,
+            :final pushedCount,
+            :final pulledCount,
+          )
           when isManual:
         if (allFailed) {
           text = "Couldn't send your changes — they're saved on this device.";
+        } else if (pushedCount > 0 && pulledCount > 0) {
+          text =
+              'Synced $pushedCount ${pushedCount == 1 ? 'change' : 'changes'} '
+              'out, $pulledCount ${pulledCount == 1 ? 'change' : 'changes'} in.';
         } else if (pushedCount > 0) {
           text =
               'Synced $pushedCount '
               '${pushedCount == 1 ? 'change' : 'changes'}.';
+        } else if (pulledCount > 0) {
+          text =
+              'Got $pulledCount ${pulledCount == 1 ? 'change' : 'changes'} '
+              'from your other devices.';
         } else {
           text = 'Already up to date.';
         }
@@ -100,8 +113,8 @@ class SyncSheet extends StatelessWidget {
               const SyncNowButton(),
               const SizedBox(height: 16),
               Text(
-                'Your changes are saved to the cloud. Syncing changes from '
-                'other devices is coming later.',
+                'Your changes are saved to the cloud and synced with your '
+                'other devices.',
                 style: textTheme.bodySmall?.copyWith(color: colors.inkFaint),
               ),
             ],

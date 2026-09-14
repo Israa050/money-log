@@ -27,6 +27,7 @@ void main() {
           'categoryId': 'cat-1',
           'occurredTime': '2026-01-01T00:00:00.000Z',
           'creationTime': '2026-01-01T00:00:00.000Z',
+          'updatedAt': '2026-01-01T00:00:00.000Z',
         }, 'user-123');
 
         expect(result, {
@@ -38,6 +39,7 @@ void main() {
           'category_id': 'cat-1',
           'occurred_at': '2026-01-01T00:00:00.000Z',
           'created_at': '2026-01-01T00:00:00.000Z',
+          'updated_at': '2026-01-01T00:00:00.000Z',
         });
       },
     );
@@ -108,6 +110,7 @@ void main() {
         'id': 'cat-1',
         'name': 'Food',
         'colorHex': '#FF9800',
+        'updatedAt': '2026-01-01T00:00:00.000Z',
       }, 'user-123');
 
       expect(result, {
@@ -115,6 +118,7 @@ void main() {
         'user_id': 'user-123',
         'name': 'Food',
         'color_hex': '#FF9800',
+        'updated_at': '2026-01-01T00:00:00.000Z',
       });
     });
 

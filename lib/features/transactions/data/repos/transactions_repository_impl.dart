@@ -68,6 +68,7 @@ class TransactionsRepositoryImpl extends TransactionsRepository {
       categoryId: Value(categoryId),
       occurredTime: Value(now),
       creationTime: Value(now),
+      updatedAt: Value(now),
     );
 
     final payload = jsonEncode({
@@ -78,6 +79,7 @@ class TransactionsRepositoryImpl extends TransactionsRepository {
       'categoryId': categoryId,
       'occurredTime': now.toIso8601String(),
       'creationTime': now.toIso8601String(),
+      'updatedAt': now.toIso8601String(),
     });
 
     try {
