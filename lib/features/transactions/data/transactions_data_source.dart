@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:stockflow/core/sync/data/models/sync_meta.dart';
 import 'package:stockflow/core/sync/data/models/sync_queue_entries.dart';
 import 'package:stockflow/core/sync/domain/entities/operation_type.dart';
 import 'package:stockflow/features/categories/data/models/categories.dart';
@@ -39,12 +40,12 @@ final _defaultCategories = [
   ),
 ];
 
-@DriftDatabase(tables: [Transactions, Categories, SyncQueueEntries])
+@DriftDatabase(tables: [Transactions, Categories, SyncQueueEntries, SyncMeta])
 class TransactionsDataSource extends _$TransactionsDataSource {
   TransactionsDataSource(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -62,6 +63,13 @@ class TransactionsDataSource extends _$TransactionsDataSource {
       }
       if (from < 4) {
         await m.createTable(syncQueueEntries);
+      }
+      if (from < 5) {
+        await m.addColumn(transactions, transactions.updatedAt);
+        await m.addColumn(categories, categories.updatedAt);
+      }
+      if (from < 6) {
+        await m.createTable(syncMeta);
       }
     },
     beforeOpen: (details) async {
@@ -89,6 +97,16 @@ class TransactionsDataSource extends _$TransactionsDataSource {
 
   Future<int> addTransaction(TransactionsCompanion entry) {
     return into(transactions).insert(entry);
+  }
+
+  Future<Transaction?> findTransactionById(String id) {
+    return (select(
+      transactions,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
+  }
+
+  Future<void> upsertTransaction(TransactionsCompanion entry) {
+    return into(transactions).insertOnConflictUpdate(entry);
   }
 
   Future<int> deleteTransaction(String id) {
@@ -122,6 +140,16 @@ class TransactionsDataSource extends _$TransactionsDataSource {
 
   Future<int> addCategory(CategoriesCompanion entry) {
     return into(categories).insert(entry);
+  }
+
+  Future<Category?> findCategoryById(String id) {
+    return (select(
+      categories,
+    )..where((c) => c.id.equals(id))).getSingleOrNull();
+  }
+
+  Future<void> upsertCategory(CategoriesCompanion entry) {
+    return into(categories).insertOnConflictUpdate(entry);
   }
 
   Future<int> deleteCategory(String id) {
@@ -190,6 +218,19 @@ class TransactionsDataSource extends _$TransactionsDataSource {
 
   Future<int> deleteSyncQueueEntry(String id) {
     return (delete(syncQueueEntries)..where((item) => item.id.equals(id))).go();
+  }
+
+  Future<DateTime?> getSyncMeta(String key) async {
+    final row = await (select(
+      syncMeta,
+    )..where((m) => m.key.equals(key))).getSingleOrNull();
+    return row?.value;
+  }
+
+  Future<void> setSyncMeta(String key, DateTime value) {
+    return into(
+      syncMeta,
+    ).insertOnConflictUpdate(SyncMetaCompanion.insert(key: key, value: value));
   }
 }
 

@@ -3,6 +3,24 @@
 Notes for each build pushed to `production`. The top entry is what
 Firebase App Distribution shows testers for the current release.
 
+## v0.7.0 — Pull sync: changes now flow back from other devices
+
+- Sync is now **two-way**. After every push (auto or manual "Sync now"),
+  the app also **pulls** changes made on other devices signed into the
+  same account and applies them locally — creating rows that don't exist
+  yet, or updating existing ones when the incoming version is newer
+  (last-write-wins by `updated_at`, so an edit made on this device after
+  its last sync is never silently overwritten).
+- Each table (transactions, categories) tracks its own "last pulled"
+  watermark, so a pull only fetches what actually changed since last time,
+  and a failure in one table's pull doesn't block or roll back the other's.
+- The "Sync now" result now reports both directions, e.g. "Synced 2
+  changes out, 1 change in."
+- **Known gap:** deleting a row on one device does not yet remove it on
+  another — pushed deletes are hard deletes with no server-side record
+  for a pull to discover. Planned as a follow-up (soft-delete/tombstone
+  column).
+
 ## v0.6.0 — Push sync to Supabase & manual "Sync now"
 
 - Local changes now actually **sync to a server**: queued transactions and

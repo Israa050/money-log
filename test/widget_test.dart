@@ -8,6 +8,7 @@ import 'package:stockflow/core/service_locator.dart';
 import 'package:stockflow/core/result.dart';
 import 'package:stockflow/core/sync/cubit/pending_sync_cubit.dart';
 import 'package:stockflow/core/sync/cubit/sync_cubit.dart';
+import 'package:stockflow/core/sync/domain/usecases/pull_remote_changes_usecase.dart';
 import 'package:stockflow/core/sync/domain/usecases/push_pending_changes_usecase.dart';
 import 'package:stockflow/core/sync/domain/usecases/watch_pending_sync_count_usecase.dart';
 import 'package:stockflow/core/sync/data/repos/sync_queue_repository_impl.dart';
@@ -59,6 +60,13 @@ class _StubPushPendingChangesUseCase implements PushPendingChangesUseCase {
   Future<Result<int>> call() async => const Success(0);
 }
 
+/// Stub use case that never actually pulls anything -- same reasoning as
+/// _StubPushPendingChangesUseCase.
+class _StubPullRemoteChangesUseCase implements PullRemoteChangesUseCase {
+  @override
+  Future<Result<int>> call() async => const Success(0);
+}
+
 void main() {
   testWidgets('App boots without throwing', (WidgetTester tester) async {
     // Registers against an in-memory Drift database instead of
@@ -82,6 +90,7 @@ void main() {
         connectivityCubit: getIt<ConnectivityCubit>(),
         pendingSyncCubit: getIt<PendingSyncCubit>(),
         pushPendingChangesUseCase: _StubPushPendingChangesUseCase(),
+        pullRemoteChangesUseCase: _StubPullRemoteChangesUseCase(),
       ),
     );
     getIt.registerSingleton<SyncQueueRepository>(

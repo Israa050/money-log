@@ -15,6 +15,7 @@ void main() {
   late SyncQueueRepository syncQueueRepository;
   late SyncRepositoryImpl repository;
   late SupabaseSyncDataSource dataSource;
+  late MockTransactionsDataSource transactionsDataSource;
 
   final myEntry = SyncQueueEntryEntity(
     id: 'q1',
@@ -33,9 +34,11 @@ void main() {
   setUp(() {
     syncQueueRepository = MockSyncQueueRepository();
     dataSource = MockSupabaseDataSource();
+    transactionsDataSource = MockTransactionsDataSource();
     repository = SyncRepositoryImpl(
       syncQueueRepository: syncQueueRepository,
       supabaseSyncDataSource: dataSource,
+      dataSource: transactionsDataSource,
     );
   });
 

@@ -14,4 +14,12 @@ abstract class SyncRepository {
   /// Returns the number of entries that were successfully pushed *and*
   /// removed from the queue.
   Future<Result<int>> pushPending();
+
+  /// Pulls rows changed remotely since each entity type's own last pull and
+  /// applies them locally with last-write-wins (newer `updated_at` wins).
+  /// Transactions and categories are pulled/watermarked independently.
+  /// Remote deletes are not propagated (no tombstone on push).
+  ///
+  /// Returns the number of rows applied locally, across both entity types.
+  Future<Result<int>> pullRemoteChanges();
 }

@@ -13,16 +13,19 @@ final class SyncInProgress extends SyncState {
   final bool isManual;
 }
 
-/// A push finished -- not necessarily successfully. [pushPending] returns a
-/// count even when every row failed, so [allFailed] is inferred, not proven.
+/// A push-then-pull finished -- not necessarily successfully. [pushPending]
+/// returns a count even when every row failed, so [allFailed] is inferred
+/// from that count, not proven; it does not reflect the pull.
 final class SyncCompleted extends SyncState {
   SyncCompleted({
     required this.pushedCount,
+    required this.pulledCount,
     required this.allFailed,
     required this.isManual,
   });
 
   final int pushedCount;
+  final int pulledCount;
   final bool allFailed;
   final bool isManual;
 }

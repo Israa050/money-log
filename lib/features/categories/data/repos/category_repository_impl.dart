@@ -72,16 +72,19 @@ class CategoryRepositoryImpl extends CategoryRepository {
     }
 
     final id = const Uuid().v4();
+    final now = DateTime.now().toUtc();
     final entry = CategoriesCompanion.insert(
       id: id,
       name: trimmedName,
       colorHex: Value(colorHex),
+      updatedAt: Value(now),
     );
 
     final payload = jsonEncode({
       'id': id,
       'name': trimmedName,
       'colorHex': colorHex,
+      'updatedAt': now.toIso8601String(),
     });
 
     try {
@@ -152,16 +155,19 @@ class CategoryRepositoryImpl extends CategoryRepository {
       return const Failure('A category with this name already exists');
     }
 
+    final now = DateTime.now().toUtc();
     final entry = CategoriesCompanion(
       id: Value(id),
       name: Value(trimmedName),
       colorHex: Value(colorHex),
+      updatedAt: Value(now),
     );
 
     final payload = jsonEncode({
       'id': id,
       'name': trimmedName,
       'colorHex': colorHex,
+      'updatedAt': now.toIso8601String(),
     });
 
     try {
