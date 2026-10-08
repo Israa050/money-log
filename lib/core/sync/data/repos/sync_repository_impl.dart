@@ -93,7 +93,8 @@ class SyncRepositoryImpl implements SyncRepository {
 
   Future<int> _pullEntityType(String entityType) async {
     final key = _watermarkKey(entityType);
-    final lastPulledAt = await dataSource.getSyncMeta(key) ?? DateTime.utc(1970);
+    final lastPulledAt =
+        await dataSource.getSyncMeta(key) ?? DateTime.utc(1970);
     // Captured before querying, not after applying, so a row that changes
     // remotely while this pull is in flight is picked up again next time
     // instead of being skipped.
