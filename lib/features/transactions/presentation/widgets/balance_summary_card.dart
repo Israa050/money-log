@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stockflow/core/theme/app_colors.dart';
 import 'package:stockflow/core/theme/app_theme.dart';
-import 'package:stockflow/features/transactions/bloc/balance_cubit.dart';
 import 'package:stockflow/features/transactions/presentation/format.dart';
 import 'package:stockflow/features/transactions/presentation/widgets/stat_pill.dart';
 
@@ -60,17 +58,7 @@ class BalanceSummaryCard extends StatelessWidget {
                 color: colors.ink,
               ),
             ),
-            BlocBuilder<BalanceCubit, int>(
-              builder: (context, dbBalance) {
-                return Padding(
-                  padding: const EdgeInsets.only(top: 2, bottom: 12),
-                  child: Text(
-                    'DB total: ${formatAmountMinor(dbBalance)}',
-                    style: TextStyle(fontSize: 11, color: colors.inkFaint),
-                  ),
-                );
-              },
-            ),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(

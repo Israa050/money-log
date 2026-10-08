@@ -53,12 +53,14 @@ class SupabaseSyncDataSource {
   }) async {
     final tableName = _tableNames[entityType] ?? entityType;
     final userId = client.auth.currentUser!.id;
+
     final rows = await client
         .from(tableName)
         .select()
         .eq('user_id', userId)
-        .gt('updated_at', since.toIso8601String())
+        .gt('updated_at', since.toUtc().toIso8601String())
         .order('updated_at');
+
     return List<Map<String, dynamic>>.from(rows);
   }
 

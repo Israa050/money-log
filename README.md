@@ -1,6 +1,13 @@
 # Money Log
 
 <p align="center">
+  <img src="assets/screenshots/money-log-hero-wide.png" alt="Money Log app overview" width="700" />
+</p>
+
+<details>
+<summary>More screenshots</summary>
+
+<p align="center">
   <img src="assets/screenshots/transactions.jpg" alt="Transactions list with balance summary" width="230" />
   &nbsp;&nbsp;
   <img src="assets/screenshots/add_transaction.jpg" alt="Add transaction bottom sheet" width="230" />
@@ -13,6 +20,8 @@
 <p align="center">
   <em>Balance summary &amp; transaction list &nbsp;·&nbsp; Add-transaction sheet &nbsp;·&nbsp; Category picker &nbsp;·&nbsp; Empty state</em>
 </p>
+
+</details>
 
 <p align="center">
   <img alt="Flutter" src="https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white" />
@@ -712,7 +721,7 @@ server yet, this is the only real backup path a user has today.
   table.
 - **Timestamps are ISO-8601 UTC strings; `amountMinor` stays an integer.**
   Same reasoning as the database schema itself (see
-  [Design decisions](#design-decisions) below): JSON has no native date
+  [Design decisions](docs/technical-decisions.md) below): JSON has no native date
   type, so `DateTime` must become a string at the export boundary, and UTC
   keeps it unambiguous across devices/timezones. Emitting a decimal amount
   instead of minor units would reintroduce exactly the floating-point
@@ -781,160 +790,13 @@ above).
 
 ### Design decisions
 
-- **`id` is a client-generated UUID (`TEXT`), not an autoincrement integer.**
-  Autoincrement IDs only exist after a row commits, which blocks
-  optimistic-UI inserts and can collide once multiple devices insert data
-  offline and later sync. A UUID can be generated before the insert and stays
-  unique across devices with no coordination. Trade-off: slightly larger
-  storage per row than an integer key — acceptable for a local, low-volume
-  ledger table.
-- **`amountMinor` is an `INTEGER` (minor units, e.g. cents), not a `double`.**
-  Floating-point can't represent most decimal fractions exactly
-  (`0.1 + 0.2 != 0.3` in IEEE 754), so summing amounts as `double` drifts over
-  time. Storing whole minor units keeps every arithmetic operation exact;
-  conversion to a display string (`$3.50`) happens only at the UI boundary.
-- **`type` is a Drift `textEnum<TransactionType>`, not a bare `TEXT` column.**
-  The set of valid values is fixed and known (`income`, `expense`), so the
-  column is typed to match — the compiler catches typos and invalid values at
-  the call site instead of letting malformed strings reach the database.
-- **`note` is nullable; `occurredTime`/`creationTime` are not.**
-  A transaction doesn't always have a note, so the column allows `NULL`.
-  Both timestamps default to "now" via `withDefault(currentDateAndTime)`, but
-  `occurredTime` can be overridden on insert to log a backdated transaction,
-  while `creationTime` is meant to always reflect actual insert time.
-- **`categoryId`'s foreign key is `ON DELETE SET NULL`, not the SQLite default
-  (`NO ACTION`) or `CASCADE`.** With categories now deletable, `NO ACTION`
-  would make deleting any category with transactions attached throw a
-  constraint violation (SQLite enforces this immediately —
-  `beforeOpen` turns `PRAGMA foreign_keys = ON`). `CASCADE` was rejected too:
-  deleting a category is removing an organizational label, not disputing
-  that money was spent, so silently destroying the transactions themselves
-  would be the wrong failure mode for a finance app. `SET NULL` orphans the
-  transaction into the existing "Uncategorized" bucket instead — a state
-  `watchCategoryTotals()`/`CategoryTotalsCard` already render correctly, so
-  no new UI branch was needed for it. This changed the schema
-  (`schemaVersion` 2 → 3) via a `TableMigration`, since SQLite can't `ALTER`
-  a column's foreign-key action in place — drift's `alterTable` rebuilds the
-  table (create-copy-drop-rename) with the new constraint.
-- **`CategoryRepository.watchCategories()` returns a `Stream<List<CategoryEntity>>`,
-  not a one-shot `Future`** (this replaced the original `Future`-returning
-  `getCategories()` once a manage-categories screen existed). A `Future`
-  fetched once in `TransactionsBloc._onLaunch` meant a category created,
-  renamed, or deleted on the new screen would not appear anywhere else —
-  the add-transaction chips, the transaction-tile pills — until the app
-  restarted, which contradicts this app's whole "no manual refresh"
-  premise. `TransactionsBloc` now holds a second `StreamSubscription`
-  (alongside the transactions one) feeding a private `_CategoriesUpdated`
-  event, so both streams merge into the same `Loaded.categories` field.
-  Trade-off: because the two subscriptions start independently and Drift
-  gives no guarantee about which one's first tick lands first, a fresh
-  `AppLaunchEvent` can legitimately emit `Loaded` more than once before
-  settling — callers should assert on the final state, not the emission
-  count (see `transactions_bloc_test.dart`'s "settles on Loaded([])" test).
-- **Category name uniqueness is enforced in `CategoryRepositoryImpl`, not as a
-  SQL `UNIQUE` constraint.** Adding a unique index would need its own schema
-  migration; validating in the repository (trim, reject empty, reject a
-  case-insensitive duplicate via `findCategoryByName`) gives the same
-  guarantee without one, and returns a `Result.failure` with a message the
-  UI can show directly instead of parsing a raw SQLite constraint error.
-  Case-insensitivity matters because SQLite's default text collation is
-  case-sensitive (`BINARY`), so `name.equals(...)` alone would let
-  `"groceries"` and `"Groceries"` coexist — `findCategoryByName` compares
-  `.lower()` on both sides specifically to close that gap.
-- **The four seeded default categories are not protected from edit or
-  delete.** They're ordinary rows distinguished only by their fixed
-  `'default-*'` ids, not a special "system category" flag — a user can
-  rename, recolor, or remove any of them. Protecting them would mean a
-  disabled delete button the user can't act on and a `startsWith('default-')`
-  check leaking into the UI layer, for a restriction nothing in the product
-  actually calls for; an empty category list is already a handled state
-  (the add sheet hides its chips section, `CategoriesScreen` shows an empty
-  state).
-- **The category color picker is a fixed swatch palette
-  (`kCategoryPalette`, 12 hex strings), not a free-form color picker
-  package.** A full HSV/RGB picker (e.g. `flutter_colorpicker`) would add a
-  dependency to an intentionally lean `pubspec.yaml` (no UI packages beyond
-  Flutter/Cupertino today) and lets a user pick a color that's illegible
-  against the app's `surface` color in one of the two themes. A curated
-  palette — a superset of the four seeded colors — is guaranteed to render
-  visibly in both light and dark mode, at the cost of not offering unlimited
-  color choice.
-- **`AddTransactionEvent`/`addTransaction(...)` take a plain `String? categoryId`,
-  not a `CategoryEntity?`.** Keeping the write path on primitive ids (the same
-  pattern `deleteTransaction(String id)` already uses) avoids the
-  `transactions` domain/repository layer importing `CategoryEntity` just to
-  read `.id` off it — a repository whose job is "persist a transaction"
-  doesn't need to know what a category *is*, only its foreign key.
-- **`categoryId` is threaded through `TransactionsBloc`, not fetched directly
-  by `AddTransactionSheet` via `get_it`.** `WatchCategoriesUseCase` is a
-  constructor dependency of `TransactionsBloc` (alongside the other three use
-  cases), subscribed to in `_onLaunch` and carried in `Loaded.categories`.
-  The alternative — the sheet calling `getIt<WatchCategoriesUseCase>()()`
-  directly in a `StreamBuilder` — would bypass the bloc layer and introduce a
-  second, inconsistent way widgets access use cases in this codebase; every
-  other read/write already goes through the bloc, so categories do too.
-- **Category CRUD lives in a new `CategoriesBloc`, not folded into
-  `TransactionsBloc`.** `TransactionsBloc` only ever *reads* categories (for
-  the chips/pills); it has no reason to also own `AddCategoryEvent`/
-  `UpdateCategoryEvent`/`DeleteCategoryEvent` and their error states —
-  doing so would bloat one bloc with two unrelated responsibilities and
-  couple `CategoriesScreen`'s lifecycle to `TransactionsScreen`'s
-  `BlocProvider`. This mirrors how `BalanceCubit` and `CategoryTotalsCubit`
-  are already separate from `TransactionsBloc` despite reading the same
-  tables — single-responsibility blocs, not one mega-bloc, is the
-  established pattern here.
-- **4 default categories (Food, Transport, Shopping, Bills) are seeded via
-  `onCreate` in `TransactionsDataSource`'s `MigrationStrategy`, with fixed
-  string ids (`'default-food'`, etc.) instead of generated UUIDs.** `onCreate`
-  only fires for brand-new databases, so existing dev installs that already
-  migrated to schema v2 do **not** retroactively get seeded rows — acceptable
-  pre-release, but would need a backfill migration once real user data exists.
-- **`categoryTotals` uses a `leftOuterJoin`, not an inner join, and filters to
-  `type == expense` at the query level rather than inside the sum.** An inner
-  join would silently drop every transaction with `categoryId == null` from
-  the result set, so "spending by category" would quietly under-report
-  instead of showing an honest "Uncategorized" bucket — the left join is what
-  makes that bucket reachable at all. Filtering with `..where(...)` before
-  `groupBy` (rather than `sum(filter: ...)`, as `balance` does) was chosen
-  because this query only ever needs one type, not two sums side by side, so
-  restricting the row set up front is simpler than filtering per-aggregate.
-- **`CategoryRepositoryImpl` maps `TypedResult` rows to a plain
-  `CategoryTotalRow` class inside `TransactionsDataSource.categoryTotals`,
-  not inside the repository.** Drift's joined-query expressions
-  (`categories.id`, the `Sum` aggregate, etc.) only exist in scope where the
-  query itself is built; re-declaring them in the repository to call
-  `row.read(...)` there would create second, independent expression
-  instances not guaranteed to match the ones the query actually used. Doing
-  the `TypedResult` → plain-object mapping at the data source boundary keeps
-  every Drift-specific type — including `TypedResult` itself — from ever
-  crossing into `data/repos/`, `domain/`, or above.
-- **`SyncQueueEntries` was added as schema v4** (`onUpgrade`'s
-  `if (from < 4) { await m.createTable(syncQueueEntries); }`) rather than
-  bundled into the v3 migration. It's an independent table with no foreign
-  keys to `Transactions`/`Categories` (see [Database schema](#-database-schema)
-  above for why the reference is deliberately soft), so a plain
-  `createTable` was sufficient — no `TableMigration`/rebuild needed the way
-  `categoryId`'s FK change required.
-- **`SyncQueueEntries.createdAt` uses `withDefault(currentDateAndTime)`,
-  not a Dart-side `DateTime.now()` passed in by the repository.** Matches
-  `Transactions.occurredTime`/`creationTime`'s existing convention of
-  letting the database stamp insert time rather than the caller — keeps
-  `SyncQueueRepositoryImpl.enqueue`'s `Companion.insert(...)` call from
-  needing to pass a timestamp at all.
-- **The codebase is organized under `lib/features/` (`transactions/`,
-  `categories/`) plus `lib/core/` (`connectivity/`, `sync/`, `theme/`),
-  rather than one flat `lib/transactions/` containing everything** (an
-  earlier structure this app briefly had). `categories/` was extracted from
-  `transactions/` once it became clear category CRUD, its bloc, and its
-  screens don't need to know anything about transactions — but the split is
-  intentionally partial: `Categories`, `SyncQueueEntries`, and the joined
-  `categoryTotals` query all still live inside
-  `transactions_data_source.dart`, because Drift's transaction/FK
-  guarantees require every table sharing those guarantees to be in one
-  `@DriftDatabase` class. Moving the *files* into `features/categories/` and
-  `core/sync/` doesn't remove that coupling — it just makes explicit which
-  parts of the app are genuinely feature-local (CRUD, bloc, screens) versus
-  genuinely shared (the database class itself, cross-table queries).
+The schema, category-coupling, and project-structure trade-offs behind this
+app (why `id` is a client-generated UUID, why `amountMinor` is an integer,
+the `ON DELETE SET NULL` choice, the fixed category palette, and more) are
+documented in full in
+**[`docs/technical-decisions.md`](docs/technical-decisions.md)** — kept
+out of this file to keep the README focused on getting started and feature
+overview.
 
 ## ✅ What's implemented
 
@@ -987,7 +849,7 @@ above).
     `TransactionsBloc`'s live category stream, so a category created,
     renamed, or deleted on the new screen is reflected everywhere
     instantly — no restart required (see
-    [Design decisions](#design-decisions) above for the full set of
+    [Design decisions](docs/technical-decisions.md) above for the full set of
     trade-offs: `ON DELETE SET NULL` vs. blocking/cascading,
     `Future`-vs-`Stream`, in-repository validation vs. a SQL constraint,
     and the fixed palette vs. a color-picker package).
@@ -1255,209 +1117,11 @@ above).
 
 ## 🏷️ Release notes
 
-### v0.6.0 — Push sync to Supabase & manual "Sync now"
-
-Adds the drain side of the transactional outbox described below, plus a
-user-triggered path on top of it. See
-[Push sync to Supabase](#push-sync-to-supabase) above for the full design
-writeup and [`docs/week5-decisions-and-interview-prep.md`](docs/week5-decisions-and-interview-prep.md)
-for the decision log.
-
-**Push sync**
-
-- Added `lib/core/env/supabase_config.dart` (reads the URL/anon key from
-  `--dart-define-from-file`) and wired `supabase_flutter`: `main()` now
-  calls `Supabase.initialize` and `signInAnonymously()` before `runApp`.
-- Added `SupabaseSyncDataSource` (`pushEntry`, `mapForSupabase`) and
-  `SyncRepository`/`SyncRepositoryImpl.pushPending()` — reads the queue,
-  pushes each row independently (one failure doesn't block the rest of the
-  pass), dequeues on success, returns a count of fully-completed rows.
-- `SyncCubit` — previously `Cubit<void>`, existing only to own two
-  subscriptions — auto-triggers `pushPending()` on reconnect and on a
-  pending-count increase while online.
-- Fixed default category ids from human-readable strings (`'default-food'`)
-  to real UUIDs — Supabase's `id` column is typed `uuid` and rejected the
-  old values.
-
-**Manual "Sync now"**
-
-- `SyncCubit` is now `Cubit<SyncState>` (`SyncIdle` / `SyncInProgress` /
-  `SyncCompleted` / `SyncFailure`, each carrying `isManual`) instead of
-  `Cubit<void>`, plus a public `syncNow()` and an in-flight guard.
-- Added `SyncNowButton` and `SyncSheet` (pending count, the button, an
-  upload-only disclaimer, a manual-only result snackbar), opened by tapping
-  `PendingSyncBadge` — which is now always visible instead of hidden at a
-  zero count.
-
-**Tests**
-
-- `test/sync/sync_repository_impl_test.dart` — `pushPending()`'s
-  independent-row processing, dequeue-on-success, and the
-  `getPending()`-failure short-circuit.
-- `test/sync/supabase_sync_data_source_test.dart` — `mapForSupabase()`'s
-  camelCase→snake_case + `user_id`-stamping, tested directly rather than
-  through `pushEntry()`'s Supabase calls (mocktail can't reliably intercept
-  the SDK's `.upsert()` awaitable chain).
-- Cubit/widget tests for `SyncCubit`'s new state and `SyncNowButton`/
-  `SyncSheet` are still pending.
-
-**Not built yet**
-
-- Pull sync, per-row error messages in the UI (only pass/fail is inferred,
-  not why), and syncing the default categories for a real account — see
-  [Not yet done](#-not-yet-done).
-
-### v0.5.0 — Connectivity & offline sync queue
-
-Groups the connectivity layer, the transactional-outbox sync queue, and the
-two UI affordances they drive (offline banner, pending-changes badge).
-
-**Connectivity layer**
-
-- Added `connectivity_plus` and a core, cross-cutting connectivity layer
-  under `lib/core/connectivity/` (`ConnectivityRepository`/Impl,
-  `WatchConnectivityUseCase`, `ConnectivityCubit`), all registered as
-  `get_it` lazy singletons. Placed in `core/`, not as its own feature or
-  inside `transactions/`, since network status is infrastructure any
-  feature may depend on, not a business concern.
-- The domain layer exposes a `NetworkStatus` enum instead of the plugin's
-  `ConnectivityResult`, and treats "offline" as a normal
-  `Success(NetworkStatus.offline)` rather than a `Result.failure` — `Failure`
-  is reserved for actual connectivity-check errors.
-- `_toNetworkStatus` maps the plugin's `List<ConnectivityResult>` with an
-  "every result is `none`" rule (not "contains `none`"), so a single active
-  interface among several inactive ones still reads as online.
-
-**Offline sync queue (transactional outbox)**
-
-- Added `lib/core/sync/`: a `SyncQueueEntries` Drift table (schema v4) plus
-  `OperationType`, `SyncQueueRepository`/`Impl`, and
-  `WatchPendingSyncCountUseCase` — the write side of a transactional
-  outbox for later Supabase sync. See
-  [Offline sync queue](#offline-sync-queue-transactional-outbox) and
-  [`docs/sync-queue.md`](docs/sync-queue.md) for the full design writeup
-  (always-enqueue over connectivity-branching, atomic transaction + enqueue,
-  snapshot-vs-pointer payload).
-- `TransactionsRepositoryImpl` and `CategoryRepositoryImpl` wrap every
-  write (`add`/`update`/`delete`) in a Drift `transaction()` alongside a
-  `syncQueueRepository.enqueue(...)` call, so a transaction/category row and
-  its sync-queue record either both commit or neither does.
-- Reorganized the codebase from a single `lib/transactions/` folder into
-  `lib/features/{transactions,categories}/` plus `lib/core/{connectivity,sync,theme}/`
-  — `categories/` now has its own `bloc/domain/data/presentation` layers,
-  separate from `transactions/`. The Drift database class itself
-  (`transactions_data_source.dart`) still hosts the `Categories` and
-  `SyncQueueEntries` table definitions alongside `Transactions`, since
-  Drift's transaction/FK guarantees require every table sharing them to be
-  in one `@DriftDatabase` class — only the table *definition files* and the
-  surrounding CRUD/bloc/UI code moved.
-
-**UI**
-
-- `OfflineBanner` (`lib/core/connectivity/presentation/widgets/`) — a strip
-  above the transaction list driven by `ConnectivityCubit`, shown while
-  offline, collapsed (`AnimatedSize`) when online. Copy is informational
-  ("changes are saved on this device"), not an error state.
-- `PendingSyncCubit` (`lib/core/sync/cubit/`, a `Cubit<int>` over
-  `watchPendingSyncCount()`) and `PendingSyncBadge`
-  (`lib/core/sync/presentation/widgets/`) — an app-bar badge showing the
-  queue count, hidden at zero. `WatchPendingSyncCountUseCase` and
-  `PendingSyncCubit` are now registered in `service_locator.dart` (they
-  existed but were unwired). Both cubits are provided app-wide via
-  `BlocProvider.value` in `main.dart`.
-- `transactions_screen.dart` body logic extracted to a private
-  `_TransactionsBody` widget so the banner can sit outside the `BlocBuilder`
-  (visible even during the initial loading spinner).
-
-**Tests**
-
-- `test/connectivity/` — `ConnectivityRepositoryImpl` (the mapping rule +
-  the `checkConnectivity` error path + stream mapping), `ConnectivityCubit`
-  (seed state, ordered emissions, `close()` cancels the subscription),
-  `WatchConnectivityUseCase` passthrough.
-- `test/sync/` — `SyncQueueRepositoryImpl` against a real in-memory Drift DB
-  (`enqueue` id/`createdAt` generation, verbatim payload storage, operation
-  enum round-trip, reactive `watchPendingCount`), `WatchPendingSyncCountUseCase`
-  passthrough.
-- `test/backup/export_serializer_test.dart` — `buildEnvelope`/`encodeExport`
-  (fixed metadata, UTC `exportedAt`, `counts` derivation, JSON round-trip).
-- `test/widget_test.dart` registers stub use cases for the two new cubits so
-  `MyApp` still boots.
-- Widget/cubit tests for `OfflineBanner`, `PendingSyncCubit`, and
-  `PendingSyncBadge` are still pending — see [Not yet done](#-not-yet-done).
-
-**Not built yet, as of this release**
-
-- The background process that drains `SyncQueueEntries` and pushes to
-  Supabase, and no Supabase client/project existed yet — both landed in
-  the push-sync release above this one.
-
-### v0.4.0 — Manage categories
-
-- Added full category CRUD behind a new "Manage Categories" screen (opened
-  from the transactions app bar): create, rename/recolor via a fixed
-  swatch palette, and delete.
-- Changed `transactions.categoryId`'s foreign key to `ON DELETE SET NULL`
-  (schema v2 → v3, via a drift `TableMigration`) so deleting a category
-  with transactions attached orphans them into "Uncategorized" instead of
-  throwing a constraint error.
-- `CategoryRepository.watchCategories()` replaced the old one-shot
-  `getCategories()`, and `TransactionsBloc` now holds a second stream
-  subscription for it — a category created, renamed, or deleted propagates
-  to the add-transaction chips and transaction pills immediately.
-- Added `addCategory`/`updateCategory`/`deleteCategory` (all `Result`-returning)
-  with name validation — trimmed, non-empty, case-insensitive-duplicate
-  rejected — enforced in the repository rather than a SQL constraint.
-- Added a new `CategoriesBloc` for category mutation, kept separate from
-  `TransactionsBloc` (which only reads categories), matching the existing
-  `BalanceCubit`/`CategoryTotalsCubit` single-responsibility split.
-- Added Drift-backed tests for category CRUD and the orphaning behavior,
-  a `CategoryRepositoryImpl` test suite mirroring
-  `transactions_repository_test.dart`, and mocktail-based
-  `CategoriesBloc` tests mirroring `transactions_bloc_mocktail_test.dart`.
-
-### v0.3.0 — Category totals & tags
-
-- Added reactive total spending per category: a Drift `leftOuterJoin` +
-  `groupBy` query (`TransactionsDataSource.categoryTotals`), wired through a
-  new `CategoryTotalEntity`, `CategoryRepository.watchCategoryTotals()`,
-  `WatchCategoryTotalsUsecase`, and `CategoryTotalsCubit` to a new
-  `CategoryTotalsCard` on the transactions screen. Uncategorized spend
-  surfaces as its own bucket instead of being dropped; income transactions
-  never inflate a category's total.
-- Made `CategoryTotalsCard` collapsible — tapping its header animates an
-  expand/collapse to free space for the transaction list below.
-- `TransactionEntity` now carries `categoryId`, and `TransactionTile` shows
-  a color-coded category pill next to the transaction title when one is set.
-- Fixed a pre-existing bottom-sheet overflow in `AddTransactionSheet` by
-  wrapping its form `Column` in a `SingleChildScrollView`.
-
-### v0.2.0 — Themed redesign
-
-- Introduced a dedicated design system (`AppColors` + `AppTheme`) with
-  light and dark color tokens — dark-first, following the system theme by
-  default — replacing the single generic Material seed color.
-- Split the 350+ line `transactions_screen.dart` into small, single-purpose
-  widgets (`BalanceSummaryCard`, `StatPill`, `TransactionsList`,
-  `TransactionsEmptyState`, `UndoSnackBarContent`), leaving the screen file
-  as pure composition and state wiring.
-- Restyled `TransactionTile` and `AddTransactionSheet` to match the new
-  visual language: circular type icons on income/expense wash colors,
-  card-style rows, and a segmented add/expense toggle.
-- Refreshed the app screenshots to reflect the new look.
-
-### v0.1.0 — Reactive core
-
-- `TransactionsBloc` made fully reactive via a single long-lived Drift
-  `.watch()` subscription — add/delete no longer trigger a manual refetch.
-- Added a DB-computed `BalanceCubit` stream and hardened amount parsing
-  (exact minor-unit arithmetic, no floating-point drift).
-- Full presentation layer: balance summary, swipe-to-delete with animated
-  undo, and an add-transaction bottom sheet.
-- Drift-backed `Transactions` schema, `TransactionsRepository`, and
-  `AppBlocObserver` for full event/state logging.
-- GitHub Actions CI running format checks, static analysis, and the full
-  test suite on every PR into `main`.
+Per-version changelog (v0.1.0 through the current v0.6.0 — push sync to
+Supabase, manual "Sync now", and everything before it) now lives in
+**[`docs/release-notes.md`](docs/release-notes.md)**, kept separate from
+this file so the README stays focused on the app as it is today rather than
+how it got here.
 
 ## 📄 License
 
