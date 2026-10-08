@@ -51,7 +51,7 @@ for the decision log.
 
 - Pull sync, per-row error messages in the UI (only pass/fail is inferred,
   not why), and syncing the default categories for a real account — see
-  [Not yet done](../README.md#-not-yet-done) in the README.
+  [Not yet done](implemented.md#-not-yet-done).
 
 ### v0.5.0 — Connectivity & offline sync queue
 
@@ -131,7 +131,7 @@ two UI affordances they drive (offline banner, pending-changes badge).
   `MyApp` still boots.
 - Widget/cubit tests for `OfflineBanner`, `PendingSyncCubit`, and
   `PendingSyncBadge` are still pending — see
-  [Not yet done](../README.md#-not-yet-done) in the README.
+  [Not yet done](implemented.md#-not-yet-done).
 
 **Not built yet, as of this release**
 
