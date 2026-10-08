@@ -1,10 +1,7 @@
 # Changelog
 
 Notes for each build pushed to `production`. The top entry is what
-Firebase App Distribution shows testers for the current release. For the
-developer-facing version of the same releases (class/file names, test
-coverage, implementation detail), see
-[`docs/release-notes.md`](docs/release-notes.md).
+Firebase App Distribution shows testers for the current release.
 
 ## v0.7.0 — Pull sync: changes now flow back from other devices
 

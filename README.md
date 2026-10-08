@@ -1117,13 +1117,11 @@ overview.
 
 ## 🏷️ Release notes
 
-Two changelogs, for two audiences:
-
-- **[`CHANGELOG.md`](CHANGELOG.md)** — user-facing release notes (what
-  Firebase App Distribution shows testers for each build).
-- **[`docs/release-notes.md`](docs/release-notes.md)** — the developer-facing
-  version: the same releases with implementation detail (class/file names,
-  test coverage added, what's still not built per release).
+Per-version changelog (v0.1.0 through the current v0.6.0 — push sync to
+Supabase, manual "Sync now", and everything before it) now lives in
+**[`docs/release-notes.md`](docs/release-notes.md)**, kept separate from
+this file so the README stays focused on the app as it is today rather than
+how it got here.
 
 ## 📄 License
 

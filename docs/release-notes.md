@@ -1,10 +1,5 @@
 # Release Notes
 
-Developer-facing changelog — implementation detail (class/file names, test
-coverage, what's still not built) for each release. For the user-facing
-version shown to testers via Firebase App Distribution, see
-[`../CHANGELOG.md`](../CHANGELOG.md).
-
 ### v0.6.0 — Push sync to Supabase & manual "Sync now"
 
 Adds the drain side of the transactional outbox described below, plus a
